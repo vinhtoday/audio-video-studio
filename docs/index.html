@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radio Video Studio — Ghép audio radio vào video, xuất đa nền tảng</title>
+<meta name="description" content="Ghép audio radio vào video và xuất đồng loạt cho TikTok, Reels, YouTube Shorts, Facebook — Rust + FFmpeg, chạy local, không cần cài đặt.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎧</text></svg>">
+<style>
+  :root {
+    --bg: #0b0e17; --bg2: #111527; --card: #161b2e; --line: #232a45;
+    --text: #e7eaf6; --dim: #97a0c0; --accent: #6366f1; --accent2: #22d3ee;
+    --ok: #34d399; --warn: #fbbf24; --r: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.65;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 40px); }
+
+  /* Hero */
+  .hero {
+    position: relative; overflow: hidden;
+    padding: clamp(56px, 10vw, 110px) 0 clamp(40px, 7vw, 80px);
+    background:
+      radial-gradient(60% 50% at 15% 0%, rgba(99,102,241,.22), transparent 70%),
+      radial-gradient(50% 40% at 90% 10%, rgba(34,211,238,.14), transparent 70%),
+      var(--bg);
+    border-bottom: 1px solid var(--line);
+  }
+  .badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+  .badge {
+    font-size: .78rem; font-weight: 600; color: var(--dim);
+    border: 1px solid var(--line); border-radius: 99px; padding: 4px 12px;
+    background: rgba(255,255,255,.03);
+  }
+  .badge b { color: var(--accent2); font-weight: 700; }
+  h1 {
+    font-size: clamp(1.9rem, 5.5vw, 3.4rem); line-height: 1.15;
+    letter-spacing: -.02em; margin-bottom: 18px;
+  }
+  h1 .grad {
+    background: linear-gradient(92deg, var(--accent2), var(--accent) 55%, #a78bfa);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero p.sub { color: var(--dim); font-size: clamp(1rem, 2.4vw, 1.18rem); max-width: 640px; }
+  .cta-row { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 30px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 13px 26px; border-radius: 12px; font-weight: 650; font-size: .98rem;
+    text-decoration: none; transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .btn-primary {
+    background: linear-gradient(160deg, var(--accent), #4f46e5); color: #fff;
+    box-shadow: 0 10px 30px -10px rgba(99,102,241,.55);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 14px 34px -10px rgba(99,102,241,.7); }
+  .btn-ghost { border: 1px solid var(--line); color: var(--text); background: rgba(255,255,255,.03); }
+  .btn-ghost:hover { border-color: var(--accent); transform: translateY(-2px); }
+
+  /* Screenshot hero */
+  .shot {
+    margin-top: clamp(36px, 6vw, 60px);
+    border-radius: var(--r); overflow: hidden;
+    border: 1px solid var(--line);
+    box-shadow: 0 30px 80px -30px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.03) inset;
+  }
+  .shot img { display: block; width: 100%; height: auto; }
+
+  /* Sections */
+  section { padding: clamp(44px, 8vw, 84px) 0; }
+  section.alt { background: var(--bg2); border-block: 1px solid var(--line); }
+  h2 { font-size: clamp(1.4rem, 3.6vw, 2rem); letter-spacing: -.01em; margin-bottom: 10px; }
+  .lead { color: var(--dim); max-width: 660px; margin-bottom: clamp(24px, 4vw, 40px); }
+
+  .grid { display: grid; gap: 16px; }
+  .g3 { grid-template-columns: repeat(3, 1fr); }
+  .g2 { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 860px) { .g3 { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 640px) { .g3, .g2 { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--r);
+    padding: 22px; transition: border-color .15s ease, transform .15s ease;
+  }
+  .card:hover { border-color: var(--accent); transform: translateY(-3px); }
+  .card .ico { font-size: 1.6rem; margin-bottom: 10px; }
+  .card h3 { font-size: 1.02rem; margin-bottom: 8px; }
+  .card p { color: var(--dim); font-size: .9rem; }
+
+  /* Pipeline */
+  .flow { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; }
+  .step {
+    flex: 1 1 150px; background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--r); padding: 18px; text-align: center; position: relative;
+  }
+  .step .n {
+    width: 30px; height: 30px; border-radius: 50%; margin: 0 auto 10px;
+    display: grid; place-items: center; font-weight: 700; font-size: .85rem;
+    background: linear-gradient(160deg, var(--accent), #4f46e5); color: #fff;
+  }
+  .step h4 { font-size: .92rem; margin-bottom: 5px; }
+  .step p { color: var(--dim); font-size: .8rem; }
+
+  /* Stats */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  @media (max-width: 720px) { .stats { grid-template-columns: 1fr 1fr; } }
+  .stat { text-align: center; padding: 22px 12px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r); }
+  .stat .v { font-size: clamp(1.5rem, 4vw, 2.1rem); font-weight: 800; letter-spacing: -.02em; }
+  .stat .v.g { color: var(--accent2); }
+  .stat .l { color: var(--dim); font-size: .8rem; margin-top: 4px; }
+
+  /* Presets chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip {
+    border: 1px solid var(--line); background: var(--card); color: var(--text);
+    border-radius: 99px; padding: 9px 18px; font-size: .88rem; font-weight: 600;
+  }
+  .chip.hot { border-color: var(--accent2); color: var(--accent2); }
+
+  /* Screenshots row */
+  .shots { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 720px) { .shots { grid-template-columns: 1fr; } }
+  .shot-sm { border-radius: var(--r); overflow: hidden; border: 1px solid var(--line); }
+  .shot-sm img { display: block; width: 100%; height: auto; }
+
+  footer {
+    border-top: 1px solid var(--line); padding: 34px 0 44px;
+    color: var(--dim); font-size: .86rem; text-align: center;
+  }
+  footer a { color: var(--accent2); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="wrap">
+    <div class="badge-row">
+      <span class="badge">Bản <b>0.5.0</b></span>
+      <span class="badge">Rust + Axum + FFmpeg</span>
+      <span class="badge">Chạy local — không cloud</span>
+      <span class="badge">MIT License</span>
+    </div>
+    <h1>Ghép audio radio vào video,<br>xuất <span class="grad">mọi nền tảng</span> chỉ bằng 1 cú bấm.</h1>
+    <p class="sub">Tải binary về, mở trình duyệt, dùng. TikTok, Reels, YouTube Shorts, Facebook, Instagram, Threads, X — render song song, đúng safe-zone từng nền tảng.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="https://github.com/vinhtoday/audio-video-studio">⭐ Xem mã nguồn trên GitHub</a>
+      <a class="btn btn-ghost" href="#tinh-nang">Tính năng</a>
+    </div>
+    <div class="shot">
+      <img src="screenshot-dark.png" alt="Giao diện Radio Video Studio ở chế độ tối — 5 bước tuyến tính và kho video" width="1440" height="900" loading="eager">
+    </div>
+  </div>
+</div>
+
+<section id="tinh-nang">
+  <div class="wrap">
+    <h2>Tinh túy gói trong 1 trang</h2>
+    <p class="lead">Mọi thứ xử lý trên máy bạn. Ngoại lệ duy nhất: phụ đề tự động (ASR) gửi audio tới dịch vụ online — không bật thì không có file nào rời máy.</p>
+    <div class="grid g3">
+      <div class="card"><div class="ico">🎬</div><h3>Ghép video + audio</h3><p>Nhiều clip kéo–thả, nhiều file audio nối tiếp. Video tự lặp cho hết bài, cắt đúng thời lượng, bỏ tiếng gốc.</p></div>
+      <div class="card"><div class="ico">🎵</div><h3>Tách âm thanh MP3</h3><p>Mới ở 0.5.0 — preset xuất MP3 320 kbps từ audio đã ghép. Chỉ chọn mỗi preset này thì không cần video.</p></div>
+      <div class="card"><div class="ico">🏷️</div><h3>Tên sản phẩm</h3><p>File tải về mang đúng tên bạn nhập — giữ dấu tiếng Việt, tự né tên cấm, trùng tên tự thành " (2)".</p></div>
+      <div class="card"><div class="ico">🗄️</div><h3>Giới hạn lưu trữ</h3><p>Kho video 5 GB / 200 file mặc định, tự dọn file cũ nhất, kiểm tra đĩa trước render, thanh dung lượng ngay trong UI.</p></div>
+      <div class="card"><div class="ico">💬</div><h3>Phụ đề burn-in</h3><p>Tự động nhận diện giọng nói (ASR) hoặc dùng file .srt — burn thẳng vào video, màu tuỳ chỉnh.</p></div>
+      <div class="card"><div class="ico">👀</div><h3>Xem trước trực tiếp</h3><p>Khung đúng tỉ lệ preset + safe-zone + chữ + watermark render bằng CSS — chưa cần ffmpeg.</p></div>
+      <div class="card"><div class="ico">✍️</div><h3>Chữ &amp; watermark</h3><p>Font upload, viền, vị trí, hẹn giờ. Watermark di chuyển 4 góc chống crop, tự né safe-zone.</p></div>
+      <div class="card"><div class="ico">🎚️</div><h3>Visualizer sóng âm</h3><p>Sóng / thanh / spectrum chạy theo audio thật — màu, độ cao, độ mờ tuỳ chỉnh.</p></div>
+      <div class="card"><div class="ico">🌗</div><h3>Dark / Light / Mobile</h3><p>Theo hệ điều hành, responsive từ 375px, giao diện tiếng Việt, 1 luồng tuyến tính 5 bước.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap">
+    <h2>5 bước, 1 nút Xuất</h2>
+    <p class="lead">Luồng tuyến tính — không menu chồng menu, đúng một nút Xuất trên toàn trang.</p>
+    <div class="flow">
+      <div class="step"><div class="n">1</div><h4>Nguồn</h4><p>Video + audio, kéo–thả sắp thứ tự</p></div>
+      <div class="step"><div class="n">2</div><h4>Nền tảng</h4><p>Chọn 1 hoặc nhiều preset</p></div>
+      <div class="step"><div class="n">3</div><h4>Xem trước</h4><p>Đúng tỉ lệ + safe-zone</p></div>
+      <div class="step"><div class="n">4</div><h4>Tuỳ chọn</h4><p>Chữ, phụ đề, watermark, audio</p></div>
+      <div class="step"><div class="n">5</div><h4>Xuất</h4><p>Render song song + kho video</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Preset cho từng nền tảng</h2>
+    <p class="lead">Độ phân giải, giới hạn thời lượng và safe-zone đã chỉnh sẵn theo UI từng app — chỉnh thêm trong <code>presets_config.json</code> không cần build lại.</p>
+    <div class="chips">
+      <span class="chip">TikTok / Reels / Shorts · 1080×1920</span>
+      <span class="chip">Facebook Feed · 1080×1350</span>
+      <span class="chip">Facebook / YouTube · 1920×1080</span>
+      <span class="chip">Instagram · 1080×1080</span>
+      <span class="chip">Threads · 1080×1350</span>
+      <span class="chip">X (Twitter) · 1280×720</span>
+      <span class="chip">Giữ nguyên gốc</span>
+      <span class="chip">Tuỳ chỉnh W×H</span>
+      <span class="chip hot">🎵 Tách âm thanh MP3 · 320 kbps</span>
+    </div>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap">
+    <h2>Chất lượng được kiểm chứng</h2>
+    <p class="lead">Không chỉ build được — mọi tính năng lớn có kịch bản E2E thật: chạy server, tạo job qua HTTP, soi file output bằng ffprobe.</p>
+    <div class="stats">
+      <div class="stat"><div class="v g">191</div><div class="l">unit test pass</div></div>
+      <div class="stat"><div class="v g">16/16</div><div class="l">E2E tách audio MP3</div></div>
+      <div class="stat"><div class="v g">9</div><div class="l">preset nền tảng</div></div>
+      <div class="stat"><div class="v g">0</div><div class="l">cảnh báo biên dịch</div></div>
+    </div>
+    <div class="shots" style="margin-top:28px">
+      <div class="shot-sm"><img src="screenshot-light.png" alt="Giao diện chế độ sáng với chip Tách âm thanh (MP3)" width="1440" height="900" loading="lazy"></div>
+      <div class="shot-sm"><img src="screenshot-mobile.png" alt="Giao diện trên điện thoại" width="390" height="844" loading="lazy"></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>🎧 <strong>Radio Video Studio</strong> — Rust + Axum + FFmpeg, MIT License.</p>
+    <p style="margin-top:6px">
+      <a href="https://github.com/vinhtoday/audio-video-studio">Mã nguồn</a> ·
+      <a href="https://github.com/vinhtoday/audio-video-studio/blob/main/RELEASE-0.5.0.md">Release 0.5.0</a> ·
+      <a href="https://github.com/vinhtoday/audio-video-studio/blob/main/README.md">README</a>
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>

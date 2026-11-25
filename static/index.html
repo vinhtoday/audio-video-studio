@@ -1031,11 +1031,14 @@
       const max = p.max_duration_sec ? `<span class="p-max">max ${Math.floor(p.max_duration_sec / 60)}:${String(Math.round(p.max_duration_sec % 60)).padStart(2, "0")}</span>` : "";
       const custom = p.id === "custom";
       const original = p.id === "original";
-      const sizeLine = custom
-        ? `<div class="p-ratio">Nhập W × H tuỳ ý</div>`
-        : original
-          ? `<div class="p-size">Theo nguồn</div><div class="p-ratio">${escapeHtml(p.note || "giữ nguyên độ phân giải")}</div>`
-          : `<div class="p-size">${p.width}×${p.height}</div><div class="p-ratio">${p.ratio || ""}</div>`;
+      const audioOnly = p.id === "audio_only"; // A1: tách âm thanh MP3
+      const sizeLine = audioOnly
+        ? `<div class="p-size">MP3 · 320 kbps</div><div class="p-ratio">chỉ audio, không video</div>`
+        : custom
+          ? `<div class="p-ratio">Nhập W × H tuỳ ý</div>`
+          : original
+            ? `<div class="p-size">Theo nguồn</div><div class="p-ratio">${escapeHtml(p.note || "giữ nguyên độ phân giải")}</div>`
+            : `<div class="p-size">${p.width}×${p.height}</div><div class="p-ratio">${p.ratio || ""}</div>`;
       chip.innerHTML = `
         <span class="p-check">✓</span>
         <div class="p-name">${escapeHtml(p.name || p.label || p.id)}</div>
@@ -1545,16 +1548,21 @@
 
   // ======================================================= export
   function canExport() {
+    // A1: chỉ chọn "Tách âm thanh" thì không cần video.
+    const audioOnly = state.selectedPresets.size > 0
+      && [...state.selectedPresets].every(id => id === "audio_only");
     return !state.busy
-      && state.clips.length > 0
+      && (state.clips.length > 0 || audioOnly)
       && state.audioFiles.length > 0
       && state.selectedPresets.size > 0
       && state.audioDuration > 0;
   }
   function refreshExportButton() {
     $("btn-export").disabled = !canExport();
+    const audioOnly = state.selectedPresets.size > 0
+      && [...state.selectedPresets].every(id => id === "audio_only");
     const hints = [];
-    if (!state.clips.length) hints.push("video");
+    if (!state.clips.length && !audioOnly) hints.push("video");
     if (!state.audioFiles.length) hints.push("audio");
     if (!state.selectedPresets.size) hints.push("preset");
     $("export-hint").textContent = hints.length ? `cần thêm: ${hints.join(" + ")}` : "sẵn sàng xuất";

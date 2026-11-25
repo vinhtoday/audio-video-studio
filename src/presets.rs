@@ -131,7 +131,24 @@ pub const PRESET_DEFS: &[PresetDef] = &[
         safe_zone: None,
         max_duration_sec: 0,
     },
+    PresetDef {
+        id: "audio_only",
+        name: "Tách âm thanh (MP3)",
+        ratio: "audio",
+        width: 0,
+        height: 0,
+        fps: 0,
+        note: "Xuất MP3 320 kbps từ audio đã ghép (áp dụng âm lượng + fade-out), không kèm video.",
+        safe_zone: None,
+        max_duration_sec: 0,
+    },
 ];
+
+/// A1: preset đặc biệt "chỉ audio" — output là MP3, không phải video.
+/// Mọi nơi rẽ nhánh theo preset đều hỏi hàm này trước.
+pub fn is_audio_only(preset_id: &str) -> bool {
+    preset_id == "audio_only"
+}
 
 /// Preset tại runtime (đã gộp override từ config, dữ liệu owned để chỉnh sửa).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -271,6 +288,15 @@ impl Registry {
                 fps: preset.fps,
                 max_duration_sec: preset.max_duration_sec,
             }),
+            // A1: tách audio — không có khung hình, đi nhánh render MP3 riêng.
+            "audio_only" => Ok(RenderTarget {
+                preset_id: preset.id.clone(),
+                label: preset.name.clone(),
+                width: None,
+                height: None,
+                fps: 0,
+                max_duration_sec: preset.max_duration_sec,
+            }),
             "custom" => {
                 let w = custom_width
                     .filter(|v| (16..=7680).contains(v))
@@ -382,6 +408,21 @@ mod tests {
         }
         assert!(reg.get("original").is_some());
         assert!(reg.get("custom").is_some());
+        assert!(reg.get("audio_only").is_some());
+    }
+
+    #[test]
+    fn audio_only_preset_resolves_without_frame() {
+        // A1: "Tách âm thanh" resolve thành target không kích thước, không fps.
+        let reg = Registry::load(None);
+        let t = reg.resolve_target("audio_only", None, None).unwrap();
+        assert_eq!(t.preset_id, "audio_only");
+        assert_eq!((t.width, t.height), (None, None));
+        assert_eq!(t.fps, 0);
+        assert!(is_audio_only(&t.preset_id));
+        assert!(!is_audio_only("tiktok_9x16"));
+        // Vẫn override được qua config như preset thường.
+        assert!(reg.get("audio_only").unwrap().note.contains("MP3"));
     }
 
     #[test]

@@ -13,13 +13,14 @@
    byte có thể test bằng input lớn — bỏ qua vì chậm, unit đã cover validate).
 """
 import json
+import os
 import sys
 import time
 import urllib.request
 import urllib.error
 
-BASE = "http://127.0.0.1:3200"
-MEDIA = "/home/z/my-project/e2e_media"
+BASE = os.environ.get("RVM_E2E_BASE", "http://127.0.0.1:3200")
+MEDIA = os.environ.get("RVM_E2E_MEDIA", "/home/z/my-project/e2e_media")
 
 
 def req(method, path, data=None, headers=None, raw=False):

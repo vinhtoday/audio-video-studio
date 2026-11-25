@@ -158,11 +158,13 @@ async fn preview_output_names(
                 presets
                     .iter()
                     .map(|p| {
+                        // A1: preset tách audio → đuôi .mp3.
+                        let ext = if crate::presets::is_audio_only(p) { "mp3" } else { "mp4" };
                         json!({
                             "preset_id": p,
                             // Preset lạ/không resolve được vẫn hiện đúng
                             // quy tắc tên (UI đã có id từ /api/presets).
-                            "name": crate::naming::preset_filename(&stem, p, multi),
+                            "name": crate::naming::preset_filename_ext(&stem, p, multi, ext),
                         })
                     })
                     .collect()
@@ -225,9 +227,6 @@ async fn create_job(
         if let Err(e) = result {
             return Err(e);
         }
-        if video_paths.is_empty() {
-            return Err(AppError::bad_request("Thiếu file video (cần ít nhất 1)."));
-        }
         if audio_paths.is_empty() {
             return Err(AppError::bad_request("Thiếu file audio (cần ít nhất 1)."));
         }
@@ -235,8 +234,17 @@ async fn create_job(
             return Err(AppError::bad_request("Tối đa 16 file audio."));
         }
         let options = options.take().ok_or_else(|| {
-            AppError::bad_request("Thiếu options JSON (presets, fit_mode, ...).")
+            AppError::bad_request("Thiếu options JSON (presets, fit_mode, ...)")
         })?;
+
+        // A1: chỉ chọn "Tách âm thanh" thì không cần video — bỏ qua bắt buộc.
+        let audio_only_job = options
+            .presets
+            .iter()
+            .all(|c| crate::presets::is_audio_only(&c.id));
+        if video_paths.is_empty() && !audio_only_job {
+            return Err(AppError::bad_request("Thiếu file video (cần ít nhất 1)."));
+        }
 
         // Gộp audio (dạng lồng đè dạng flat) NGAY để validate đúng giá trị
         // client thực sự gửi — tránh âm lượng ngoài khoảng bị bỏ qua im lặng.
@@ -600,7 +608,7 @@ async fn download_job(
             .join(uuid.to_string())
             .join(format!("{}__{filename}", child.preset_id));
     }
-    serve_file(&path, &filename, "video/mp4").await
+    serve_file(&path, &filename, mime_for(&path)).await
 }
 
 /// GET /api/jobs/:id/download/:preset — file mp4 của 1 preset cụ thể.
@@ -626,7 +634,15 @@ async fn download_child(
                 .to_string_lossy()
                 .into_owned()
         });
-    serve_file(&path, &display, "video/mp4").await
+    serve_file(&path, &display, mime_for(&path)).await
+}
+
+/// A1: mime theo đuôi file output — mp3 → audio/mpeg, còn lại mp4.
+fn mime_for(path: &std::path::Path) -> &'static str {
+    match path.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()) {
+        Some(ext) if ext == "mp3" => "audio/mpeg",
+        _ => "video/mp4",
+    }
 }
 
 async fn serve_file(path: &std::path::Path, filename: &str, mime: &str) -> AppResult<Response> {
@@ -639,8 +655,10 @@ async fn serve_file(path: &std::path::Path, filename: &str, mime: &str) -> AppRe
     let mut headers = HeaderMap::new();
     headers.insert(
         header::CONTENT_TYPE,
+        // A1: MP3 tải về với đúng mime (audio/mpeg) thay vì video/mp4.
         header::HeaderValue::from_static(match mime {
             "application/zip" => "application/zip",
+            "audio/mpeg" => "audio/mpeg",
             _ => "video/mp4",
         }),
     );
@@ -706,7 +724,11 @@ async fn serve_video_range(
         .map_err(|e| AppError::internal(format!("Không mở được file: {e}")))?;
 
     let mut headers = HeaderMap::new();
-    headers.insert(header::CONTENT_TYPE, header::HeaderValue::from_static("video/mp4"));
+    // A1: file trong kho có thể là MP3 (preset Tách âm thanh) — mime theo đuôi.
+    headers.insert(header::CONTENT_TYPE, {
+        let mime = mime_for(path);
+        header::HeaderValue::from_static(mime)
+    });
     headers.insert(header::ACCEPT_RANGES, header::HeaderValue::from_static("bytes"));
     // A2: kèm filename* UTF-8 để tên tải về giữ dấu tiếng Việt.
     headers.insert(

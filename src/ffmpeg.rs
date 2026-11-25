@@ -707,6 +707,65 @@ pub fn build_final_args(
     args
 }
 
+/// A1 — "Tách âm thanh": args ffmpeg xuất MP3 từ audio đã ghép.
+///
+/// Chỉ map dòng audio (bỏ video), áp dụng cùng bộ lọc volume + fade-out
+/// như bản video (đúng `out_duration` = min(audio, max_duration)), encode
+/// libmp3lame 320 kbps chuẩn 44,1 kHz stereo. Không dùng `-stream_loop`
+/// vì không có dòng video cần lặp.
+pub fn build_mp3_args(
+    audio: &Path,
+    output: &Path,
+    audio_duration: f64,
+    max_duration_sec: Option<u64>,
+    options: &AudioOptions,
+) -> Vec<String> {
+    let mut args: Vec<String> = Vec::new();
+    args.push("-hide_banner".into());
+    args.push("-loglevel".into());
+    args.push("error".into());
+
+    args.push("-i".into());
+    args.push(audio.to_string_lossy().into_owned());
+
+    args.push("-vn".into());
+    args.push("-map".into());
+    args.push("0:a:0".into());
+
+    let out_duration = match max_duration_sec {
+        Some(max) if (max as f64) < audio_duration => max as f64,
+        _ => audio_duration,
+    };
+    let mut filters: Vec<String> = Vec::new();
+    if options.volume != 100.0 {
+        let factor = options.volume / 100.0;
+        filters.push(format!("volume={factor:.4}"));
+    }
+    if options.fade_out > 0.0 {
+        let fade = options.fade_out.min(out_duration).max(0.0);
+        let start = (out_duration - fade).max(0.0);
+        filters.push(format!("afade=t=out:st={start:.3}:d={fade:.3}"));
+    }
+    if !filters.is_empty() {
+        args.push("-af".into());
+        args.push(filters.join(","));
+    }
+
+    args.push("-c:a".into());
+    args.push("libmp3lame".into());
+    args.push("-b:a".into());
+    args.push("320k".into());
+    args.push("-ar".into());
+    args.push("44100".into());
+    args.push("-ac".into());
+    args.push("2".into());
+    args.push("-t".into());
+    args.push(format!("{out_duration:.6}"));
+    args.push("-y".into());
+    args.push(output.to_string_lossy().into_owned());
+    args
+}
+
 // ---------------------------------------------------------------------------
 // Chạy ffmpeg + parse progress (giữ nguyên từ giai đoạn 1)
 // ---------------------------------------------------------------------------
@@ -1297,6 +1356,44 @@ mod tests {
         assert!(args[af + 1].contains("afade=t=out:st=118.000:d=2.000"));
         let t = args.iter().position(|a| a == "-t").unwrap();
         assert_eq!(args[t + 1], "120.000000");
+    }
+
+    #[test]
+    fn mp3_args_encode_flac_to_mp3_320() {
+        // A1: tách audio — không video, libmp3lame 320k, đúng duration + filter.
+        let args = build_mp3_args(
+            Path::new("/tmp/radio.flac"),
+            Path::new("/tmp/out.mp3"),
+            120.0,
+            None,
+            &aopts(150.0, 2.0, false),
+        );
+        let s = args.join(" ");
+        assert!(s.contains("-i /tmp/radio.flac"), "{s}");
+        assert!(s.contains("-vn"), "phải bỏ video: {s}");
+        assert!(s.contains("-map 0:a:0"), "{s}");
+        assert!(s.contains("-c:a libmp3lame"), "{s}");
+        assert!(s.contains("-b:a 320k"), "{s}");
+        assert!(s.contains("-ar 44100"), "{s}");
+        assert!(!s.contains("-stream_loop"), "audio không lặp: {s}");
+        let af = args.iter().position(|a| a == "-af").unwrap();
+        assert!(args[af + 1].contains("volume=1.5"));
+        assert!(args[af + 1].contains("afade=t=out:st=118.000:d=2.000"));
+        let t = args.iter().position(|a| a == "-t").unwrap();
+        assert_eq!(args[t + 1], "120.000000");
+    }
+
+    #[test]
+    fn mp3_args_respect_max_duration() {
+        let args = build_mp3_args(
+            Path::new("/tmp/a.wav"),
+            Path::new("/tmp/o.mp3"),
+            300.0,
+            Some(60),
+            &aopts(100.0, 0.0, false),
+        );
+        let t = args.iter().position(|a| a == "-t").unwrap();
+        assert_eq!(args[t + 1], "60.000000");
     }
 
     #[test]

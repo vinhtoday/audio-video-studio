@@ -140,11 +140,19 @@ pub fn resolve_stem(input: &str, strip: bool) -> Option<String> {
 /// Tên file mp4 của 1 preset theo quy tắc:
 /// - 1 preset: `<tên>.mp4`;
 /// - nhiều preset: `<tên>_<preset_id>.mp4`.
+/// (Bản production gọi [`preset_filename_ext`]; hàm này giữ lại cho test hồi
+/// quy A2 cũ và làm alias dễ đọc.)
+#[allow(dead_code)]
 pub fn preset_filename(stem: &str, preset_id: &str, multi: bool) -> String {
+    preset_filename_ext(stem, preset_id, multi, "mp4")
+}
+
+/// Như [`preset_filename`] nhưng đuôi tuỳ chọn (A1: `mp3` cho tách audio).
+pub fn preset_filename_ext(stem: &str, preset_id: &str, multi: bool, ext: &str) -> String {
     if multi {
-        format!("{stem}_{preset_id}.mp4")
+        format!("{stem}_{preset_id}.{ext}")
     } else {
-        format!("{stem}.mp4")
+        format!("{stem}.{ext}")
     }
 }
 

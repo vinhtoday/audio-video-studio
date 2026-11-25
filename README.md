@@ -2,6 +2,10 @@
 
 **Ghép audio radio vào video và xuất đồng loạt cho mọi nền tảng — TikTok, Reels, YouTube Shorts, Facebook, Instagram, Threads, X — chỉ bằng 1 cú bấm.**
 
+[![CI](https://github.com/vinhtoday/audio-video-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/vinhtoday/audio-video-studio/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/badge/release-0.5.0-6366f1)](RELEASE-0.5.0.md)
+[![License: MIT](https://img.shields.io/badge/license-MIT-334155)](LICENSE)
+
 Web app chạy local (Rust + Axum + FFmpeg): tải binary về, mở trình duyệt, dùng. Toàn bộ xử lý video/audio chạy trên máy bạn. **Ngoại lệ duy nhất:** tính năng **phụ đề tự động (ASR)** gửi đoạn audio tới dịch vụ nhận dạng giọng nói online của z.ai (xem [Phụ đề tự động chạy thế nào](#-phụ-đề-tự-động-chạy-thế-nào)) — nếu không bật tính năng này thì không có file nào rời khỏi máy.
 
 ![Giao diện tối](docs/screenshot-dark.png)
@@ -11,7 +15,8 @@ Web app chạy local (Rust + Axum + FFmpeg): tải binary về, mở trình duy�
 | Nhóm | Chi tiết |
 | --- | --- |
 | 🎬 **Ghép video + audio** | Nhiều clip, kéo–thả sắp thứ tự. Nhiều file audio nối tiếp. Chuỗi video **tự lặp** cho hết bài nhạc, cắt đúng thời lượng audio, bỏ tiếng gốc. |
-| 📱 **9 preset nền tảng** | TikTok 9:16, Facebook Feed 4:5, Facebook/YouTube 16:9, Instagram 1:1, Threads 4:5, X 16:9, giữ nguyên gốc, tuỳ chỉnh W×H. Chọn nhiều → **render song song**. |
+| 📱 **9 preset nền tảng** | TikTok 9:16, Facebook Feed 4:5, Facebook/YouTube 16:9, Instagram 1:1, Threads 4:5, X 16:9, giữ nguyên gốc, tuỳ chỉnh W×H, **tách âm thanh MP3**. Chọn nhiều → **render song song**. |
+| 🎵 **Tách âm thanh (MP3)** | Preset cuối trong danh sách: xuất **MP3 320 kbps / 44,1 kHz stereo** từ audio đã ghép (áp dụng âm lượng + fade-out), không kèm video. Chỉ chọn mỗi preset này thì **không cần upload video**. Kết hợp với preset video → zip chứa cả `.mp3` + `.mp4`; tên file `<tên>_audio_only.mp3` theo quy tắc "Tên sản phẩm". |
 | 🔀 **Chuyển cảnh** | xfade giữa các clip: fade / smoothleft / circleopen / dissolve, thời lượng 0–1s. |
 | 🎞️ **3 chế độ khớp khung** | Che lấp (crop) · viền đen (pad) · nền mờ (blur). |
 | ✍️ **Chữ overlay** | Tiêu đề chương trình: font hệ thống hoặc upload `.ttf`/`.otf`, cỡ/màu/viền, vị trí trên/giữa/dưới, hẹn giờ hiện từ–đến. Escape an toàn `:` `'` `\` `%` + UTF-8 tiếng Việt. |
@@ -220,6 +225,7 @@ MIT — xem [LICENSE](LICENSE).
 
 ![Giao diện mobile](docs/screenshot-mobile.png)
 
-## Bản 0.4 — rà soát mã nguồn
+## Lịch sử phiên bản
 
-Danh sách bug đã sửa, tính năng mới và những phần chưa làm xem ở `RELEASE-0.4.md`.
+- **Bản 0.5.0** — A1 Tách âm thanh MP3 · A2 Tên sản phẩm · A3 Giới hạn lưu trữ kho video. Chi tiết: [`RELEASE-0.5.0.md`](RELEASE-0.5.0.md).
+- **Bản 0.4** — rà soát mã nguồn + visualizer sóng âm, thanh tiến độ, chất lượng encode. Chi tiết: [`RELEASE-0.4.md`](RELEASE-0.4.md).

@@ -16,10 +16,11 @@ import time
 import urllib.parse
 import urllib.request
 
-sys.path.insert(0, "/home/z/my-project/scripts")
+# Đường dẫn media: mặc định theo repo, ghi đè qua env RVM_E2E_MEDIA.
+import os
 
-BASE = "http://127.0.0.1:3200"
-MEDIA = "/home/z/my-project/e2e_media"
+BASE = os.environ.get("RVM_E2E_BASE", "http://127.0.0.1:3200")
+MEDIA = os.environ.get("RVM_E2E_MEDIA", "/home/z/my-project/e2e_media")
 NAME = "Kem chống nắng"
 
 

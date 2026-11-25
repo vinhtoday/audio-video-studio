@@ -661,6 +661,7 @@ pub async fn run_job(
         .and_then(|n| crate::naming::resolve_stem(n, options.output_name_strip));
 
     // 3. Validate + probe từng video clip MỘT LẦN (dùng chung cho mọi preset).
+    //    (Job chỉ-audio không gửi video — routes đã cho phép; khối này bỏ qua.)
     let mut clips: Vec<ClipInfo> = Vec::new();
     for (i, path) in video_paths.iter().enumerate() {
         match probe(path).await {
@@ -683,7 +684,10 @@ pub async fn run_job(
     }
     // Với preset "giữ nguyên gốc", các clip phải cùng kích thước thì concat
     // mới hoạt động — báo lỗi rõ thay vì để ffmpeg lỗi mơ hồ.
-    let has_original = targets.iter().any(|t| t.width.is_none());
+    // (audio_only cũng width=None nhưng không cần clip, loại khỏi kiểm tra.)
+    let has_original = targets
+        .iter()
+        .any(|t| t.width.is_none() && !crate::presets::is_audio_only(&t.preset_id));
     if has_original && clips.len() >= 2 {
         let first = (clips[0].width, clips[0].height);
         let mismatch = clips.iter().enumerate().find(|(_, c)| {
@@ -711,15 +715,26 @@ pub async fn run_job(
     let clips = Arc::new(clips);
 
     // 4. Tách preset: kích thước cố định (dùng chung chuỗi ghép) vs giữ nguyên gốc.
+    //    A1: preset "audio_only" đi nhánh riêng (xuất MP3, không đụng video).
     let mut ok_outputs: Vec<(String, PathBuf)> = Vec::new();
+    let audio_only_targets: Vec<RenderTarget> = targets
+        .iter()
+        .filter(|t| crate::presets::is_audio_only(&t.preset_id))
+        .cloned()
+        .collect();
     let fixed: Vec<RenderTarget> = targets
         .iter()
-        .filter(|t| t.width.is_some() && t.height.is_some())
+        .filter(|t| {
+            t.width.is_some() && t.height.is_some() && !crate::presets::is_audio_only(&t.preset_id)
+        })
         .cloned()
         .collect();
     let originals: Vec<RenderTarget> = targets
         .iter()
-        .filter(|t| t.width.is_none() || t.height.is_none())
+        .filter(|t| {
+            (t.width.is_none() || t.height.is_none())
+                && !crate::presets::is_audio_only(&t.preset_id)
+        })
         .cloned()
         .collect();
     let fixed_ids: Vec<String> = fixed.iter().map(|t| t.preset_id.clone()).collect();
@@ -872,6 +887,48 @@ pub async fn run_job(
     }
 
 
+
+    // 4c. A1 — preset "Tách âm thanh": xuất MP3 trực tiếp từ audio đã ghép.
+    //     Chạy song song với các preset video ở trên (chỉ 1 ffmpeg nhẹ, không
+    //     qua semaphore vì gần như không ăn CPU/IO như encode x264).
+    if !audio_only_targets.is_empty() {
+        let mut set: tokio::task::JoinSet<(String, Result<PathBuf, PresetError>)> =
+            tokio::task::JoinSet::new();
+        for target in &audio_only_targets {
+            let store = store.clone();
+            let job_id = job_id;
+            let target = target.clone();
+            let audio_path = audio_path.clone();
+            let options = options.clone();
+            let job_dir = job_dir.clone();
+            let out_stem = output_stem.clone();
+            let multi = targets.len() > 1;
+            let audio_duration = audio_info.duration;
+            set.spawn(async move {
+                if is_cancelled(&store, &job_id).await {
+                    return (target.preset_id.clone(), Err(PresetError::Cancelled));
+                }
+                store.mark_child_running(&job_id, &target.preset_id).await;
+                let res = render_audio_only(
+                    &store, &job_id, &target, &audio_path, audio_duration, &options,
+                    &job_dir, out_stem.as_deref(), multi,
+                )
+                .await;
+                (target.preset_id.clone(), res)
+            });
+        }
+        match drain_preset_results(&store, &job_id, &parent_token, set).await {
+            Ok(Some(outputs)) => ok_outputs.extend(outputs),
+            Ok(None) => {
+                store.update(&job_id, |j| j.status = JobStatus::Cancelled).await;
+                return;
+            }
+            Err(msg) => {
+                fail(&store, &job_id, &msg).await;
+                return;
+            }
+        }
+    }
 
     // 5. Zip nếu >= 2 file done. Tên file zip tải về: "Tên sản phẩm".zip khi
     //    người dùng đặt tên (job.zip tên vật lý trên đĩa giữ nguyên — route
@@ -1841,14 +1898,55 @@ fn out_duration_for(audio_duration: f64, max_duration_sec: Option<u64>) -> f64 {
 /// Tên file output của 1 preset. Có "Tên sản phẩm" (`out_stem`) thì đặt theo
 /// quy tắc A2: `<tên>.mp4` (1 preset) / `<tên>_<preset_id>.mp4` (nhiều
 /// preset); không có thì giữ cách đặt tên mặc định cũ.
+/// A1: preset audio_only dùng đuôi `.mp3`.
 fn output_filename(target: &RenderTarget, out_stem: Option<&str>, multi: bool) -> String {
+    let ext = if crate::presets::is_audio_only(&target.preset_id) { "mp3" } else { "mp4" };
     match out_stem {
-        Some(stem) => crate::naming::preset_filename(stem, &target.preset_id, multi),
+        Some(stem) => crate::naming::preset_filename_ext(stem, &target.preset_id, multi, ext),
         None => match (target.width, target.height) {
-            (Some(w), Some(h)) => format!("radio_{}_{}x{}.mp4", target.preset_id, w, h),
-            _ => format!("radio_{}.mp4", target.preset_id),
+            (Some(w), Some(h)) => format!("radio_{}_{}x{}.{ext}", target.preset_id, w, h),
+            _ => format!("radio_{}.{ext}", target.preset_id),
         },
     }
+}
+
+/// A1 — render preset "Tách âm thanh": 1 ffmpeg duy nhất, input là audio
+/// đã ghép (nhiều file đã concat từ bước 1), output MP3 320 kbps. Tiến độ
+/// 0→100 theo out_time / audio_duration. Không đụng clip video, không
+/// overlay/watermark (không có khung hình để đặt lên).
+#[allow(clippy::too_many_arguments)]
+async fn render_audio_only(
+    store: &JobStore,
+    job_id: &Uuid,
+    target: &RenderTarget,
+    audio_path: &std::path::Path,
+    audio_duration: f64,
+    options: &JobOptions,
+    job_dir: &std::path::Path,
+    out_stem: Option<&str>,
+    multi: bool,
+) -> Result<PathBuf, PresetError> {
+    let tid = target.preset_id.clone();
+    let target_label = target.preset_id.clone();
+    let out_final = job_dir.join(output_filename(target, out_stem, multi));
+    let args = crate::ffmpeg::build_mp3_args(
+        audio_path,
+        &out_final,
+        audio_duration,
+        target.max_duration_sec,
+        &options.audio(),
+    );
+    run_step(
+        store,
+        job_id,
+        &[tid],
+        &format!("preset {target_label}: xuất MP3"),
+        args,
+        |frac| frac * 100.0,
+        audio_duration,
+    )
+    .await?;
+    Ok(out_final)
 }
 
 /// Chạy 1 bước ffmpeg của job con, cập nhật tiến độ theo trọng số.
