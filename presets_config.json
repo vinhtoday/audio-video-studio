@@ -1,0 +1,15 @@
+{
+  "presets": {
+    "tiktok_9x16": { "max_duration_sec": 180 },
+    "fb_feed_4x5": { "max_duration_sec": 0 },
+    "threads_4x5": { "max_duration_sec": 0 },
+    "kenh_rieng_1x1": {
+      "name": "Kênh riêng",
+      "ratio": "1:1",
+      "width": 720,
+      "height": 720,
+      "note": "Preset thêm mẫu bằng presets_config.json (không cần build lại).",
+      "max_duration_sec": 60
+    }
+  }
+}

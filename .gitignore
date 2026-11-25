@@ -1,0 +1,26 @@
+# Build artifacts
+/target/
+/bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Runtime data (tạo lúc chạy app — không commit)
+/workspace/
+/library/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test media tạm
+*.tmp
