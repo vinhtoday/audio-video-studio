@@ -26,6 +26,8 @@ pub struct Cue {
 }
 
 /// "12.345" → "00:00:12,345" (SRT).
+/// Chỉ unit test dùng hiện tại — giữ làm tài liệu hành vi + dự kiến nối vào UI bản sau.
+#[allow(dead_code)]
 pub fn srt_time(sec: f64) -> String {
     let ms = (sec.max(0.0) * 1000.0).round() as u64;
     format!(
@@ -263,6 +265,8 @@ pub fn parse_srt(content: &str) -> Result<Vec<Cue>, String> {
 
 /// Đổi cue từ dạng SRT (text đã escape) sang ASS: xuống dòng mềm → `\N`.
 /// (Thẻ HTML đã được đổi ngay khi parse.)
+/// Chỉ unit test dùng hiện tại — giữ làm tài liệu hành vi + dự kiến nối vào UI bản sau.
+#[allow(dead_code)]
 pub fn cues_to_ass_text(cues: &mut [Cue]) {
     for c in cues.iter_mut() {
         c.text = c.text.replace('\n', "\\N");
@@ -272,6 +276,8 @@ pub fn cues_to_ass_text(cues: &mut [Cue]) {
 /// Dời cue về timeline của một PHẦN video [start, end) (chế độ chia phần):
 /// cue nằm ngoài phần bị bỏ, cue vắt lề bị cắt gọn, mốc thời gian trừ đi
 /// `start`. Giữ nguyên thứ tự.
+/// Chỉ unit test dùng hiện tại — giữ làm tài liệu hành vi + dự kiến nối vào UI bản sau.
+#[allow(dead_code)]
 pub fn shift_and_clip(cues: &[Cue], start: f64, end: f64) -> Vec<Cue> {
     cues.iter()
         .filter_map(|c| {
@@ -468,6 +474,8 @@ pub fn char_width_em(c: char) -> f64 {
 }
 
 /// Bỏ các override tag `{\…}` của ASS khi đo bề rộng.
+/// Chỉ unit test dùng hiện tại — giữ làm tài liệu hành vi + dự kiến nối vào UI bản sau.
+#[allow(dead_code)]
 fn strip_override_tags(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut in_tag = false;
@@ -495,6 +503,8 @@ fn strip_override_tags(text: &str) -> String {
 
 /// Ước lượng số dòng cần để hiển thị `text` (ASS) trong `usable_width` px với
 /// cỡ `em_px` (px của một em). Mỗi `\N` là một dòng cứng.
+/// Chỉ unit test dùng hiện tại — giữ làm tài liệu hành vi + dự kiến nối vào UI bản sau.
+#[allow(dead_code)]
 pub fn estimate_lines(text: &str, em_px: f64, usable_width: u32) -> usize {
     if em_px <= 0.0 || usable_width == 0 {
         return 1;
@@ -683,7 +693,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_srt_bom_cRLF_blocks_dinh_nhau() {
+    fn parse_srt_bom_crlf_blocks_dinh_nhau() {
         let srt = "\u{feff}1\r\n00:00:01.000 --> 00:00:02.000\r\nMột\r\n2\r\n00:00:03.000 --> 00:00:04.000\r\nHai";
         let cues = parse_srt(srt).unwrap();
         assert_eq!(cues.len(), 2, "{cues:?}");

@@ -28,6 +28,9 @@ use crate::visuals::{self, VisualOptions};
 /// Thư mục làm việc: `./workspace/<job_id>/`.
 pub const WORKSPACE_DIR: &str = "./workspace";
 
+/// Thư mục kho output đã xuất (A2/A3).
+pub const LIBRARY_DIR: &str = "library";
+
 /// Các file đính kèm giai đoạn 3 (đã lưu xuống job_dir khi parse multipart).
 #[derive(Debug, Default)]
 pub struct Uploads {
@@ -147,6 +150,13 @@ pub struct JobOptions {
     /// Hiệu ứng hình ảnh: visualizer theo audio, thanh tiến độ.
     #[serde(default)]
     pub visuals: VisualOptions,
+    /// A2: "Tên sản phẩm" — tên file output người dùng nhập (tuỳ chọn).
+    /// Trống/không gửi → giữ cách đặt tên mặc định (`radio_<preset>…`).
+    #[serde(default)]
+    pub output_name: Option<String>,
+    /// A2: bỏ dấu tiếng Việt trong tên file (đ→d, khoảng trắng→`-`).
+    #[serde(default)]
+    pub output_name_strip: bool,
 }
 
 impl JobOptions {
@@ -205,6 +215,9 @@ pub struct Job {
     pub children: Vec<ChildJob>,
     /// Token kill ffmpeg của job con đang chạy.
     pub cancel: Option<CancellationToken>,
+    /// A2: "Tên sản phẩm" đã làm sạch (None → đặt tên mặc định). Dùng để
+    /// sinh tên file zip tải về và cho API preview tên file.
+    pub output_stem: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -238,13 +251,28 @@ impl From<&Job> for JobStatusResponse {
 #[derive(Clone)]
 pub struct JobStore {
     jobs: Arc<RwLock<HashMap<Uuid, Job>>>,
+    /// A3: giới hạn kho — run_job cần dọn sau mỗi job con mà không nhận
+    /// AppState; giữ tham chiếu SettingsStore (None trong unit test).
+    settings: Option<crate::storage::SettingsStore>,
 }
 
 impl JobStore {
     pub fn new() -> Self {
         Self {
             jobs: Arc::new(RwLock::new(HashMap::new())),
+            settings: None,
         }
+    }
+
+    /// A3: gắn settings vào store (main gọi sau khi load settings.json).
+    pub fn with_settings(mut self, s: crate::storage::SettingsStore) -> Self {
+        self.settings = Some(s);
+        self
+    }
+
+    /// A3: snapshot giới hạn hiện tại (None khi không cấu hình — bỏ qua dọn).
+    fn settings_snapshot(&self) -> Option<crate::storage::LibrarySettings> {
+        self.settings.as_ref().map(|s| s.inner_blocking_get())
     }
 
     pub async fn insert(&self, job: Job) {
@@ -272,9 +300,39 @@ impl JobStore {
         jobs.get(id).and_then(|j| j.zip.clone())
     }
 
+    /// A2: tên file zip tải về ("<Tên sản phẩm>.zip"; None khi không đặt tên).
+    pub async fn get_output_zip_name(&self, id: &Uuid) -> Option<String> {
+        let jobs = self.jobs.read().await;
+        jobs.get(id)
+            .and_then(|j| j.output_stem.clone())
+            .map(|stem| crate::naming::zip_filename(&stem))
+    }
+
     /// Lay duong dan 1 file output cua job con (theo preset id): uu tien
     /// workspace (dang render / xong gan day), fallback library/<job_id>/
     /// <preset_id>__<filename> (job cu sau khi workspace da don).
+    /// A2: tên hiển thị (tên tải về) của 1 job con — chính là `child.filename`
+    /// (đã là "Tên sản phẩm" nếu người dùng đặt), không lẫn tiền tố kho.
+    pub async fn get_child_display_name(&self, id: &Uuid, preset_id: &str) -> Option<String> {
+        let jobs = self.jobs.read().await;
+        jobs.get(id)?
+            .children
+            .iter()
+            .find(|c| c.preset_id == preset_id)?
+            .filename
+            .clone()
+    }
+
+    /// A3: ID (dạng string, trùng tên thư mục trong library/) của mọi job
+    /// đang chờ/đang chạy — dọn kho phải bảo vệ output các job này.
+    pub async fn active_job_ids(&self) -> Vec<String> {
+        let jobs = self.jobs.read().await;
+        jobs.iter()
+            .filter(|(_, j)| matches!(j.status, JobStatus::Queued | JobStatus::Running))
+            .map(|(id, _)| id.to_string())
+            .collect()
+    }
+
     pub async fn get_child_output(&self, id: &Uuid, preset_id: &str) -> Option<PathBuf> {
         let jobs = self.jobs.read().await;
         let job = jobs.get(id)?;
@@ -285,7 +343,7 @@ impl JobStore {
             return Some(ws_path);
         }
         // Fallback: kho library (output da copy o drain_preset_results).
-        let lib = std::path::PathBuf::from("library")
+        let lib = std::path::PathBuf::from(LIBRARY_DIR)
             .join(job.id.to_string())
             .join(format!("{preset_id}__{filename}"));
         if tokio::fs::try_exists(&lib).await.unwrap_or(false) {
@@ -349,9 +407,26 @@ impl JobStore {
         recompute_parent(job);
     }
 
+    /// Đánh dấu 1 job con bắt đầu chạy thật (đã có slot) rồi tính lại cha.
+    async fn mark_child_running(&self, id: &Uuid, preset_id: &str) {
+        self.update_child(id, preset_id, |c| {
+            if c.status == JobStatus::Queued {
+                c.status = JobStatus::Running;
+            }
+        })
+        .await;
+    }
+
     /// Cập nhật tiến độ job con (được gọi từ callback ffmpeg).
     async fn set_child_progress(&self, id: &Uuid, preset_id: &str, pct: f64) {
-        self.update_child(id, preset_id, |c| c.progress = pct).await;
+        self.update_child(id, preset_id, |c| {
+            // Progress chỉ có nghĩa khi con đang chạy — con đã done/error thì
+            // giữ nguyên mốc của nó.
+            if c.status == JobStatus::Queued || c.status == JobStatus::Running {
+                c.progress = pct;
+            }
+        })
+        .await;
     }
 }
 
@@ -369,7 +444,7 @@ fn recompute_parent(job: &mut Job) {
     job.progress = job.children.iter().map(|c| c.progress).sum::<f64>() / total as f64;
 
     if done + error + cancelled < total {
-        // Vẫn còn job con đang chạy.
+        // Vẫn còn job con đang chạy/đợi.
         if job.status == JobStatus::Queued {
             job.status = JobStatus::Running;
         }
@@ -578,6 +653,13 @@ pub async fn run_job(
 
     store.update(&job_id, |j| j.status = JobStatus::Running).await;
 
+    // A2: "Tên sản phẩm" → stem dùng chung cho mọi tên file output của job.
+    // Rỗng sau khi làm sạch → None → mọi chỗ rơi về tên mặc định cũ.
+    let output_stem = options
+        .output_name
+        .as_deref()
+        .and_then(|n| crate::naming::resolve_stem(n, options.output_name_strip));
+
     // 3. Validate + probe từng video clip MỘT LẦN (dùng chung cho mọi preset).
     let mut clips: Vec<ClipInfo> = Vec::new();
     for (i, path) in video_paths.iter().enumerate() {
@@ -697,6 +779,8 @@ pub async fn run_job(
             let options = options.clone();
             let job_dir = job_dir.clone();
             let sem = Arc::clone(&sem);
+            let out_stem = output_stem.clone();
+            let multi = targets.len() > 1;
             set.spawn(async move {
                 // Chưa tới lượt hoặc job đã huỷ → thoát sớm, không chiếm slot.
                 if is_cancelled(&store, &job_id).await {
@@ -706,10 +790,12 @@ pub async fn run_job(
                     Ok(p) => p,
                     Err(_) => return (target.preset_id.clone(), Err(PresetError::Cancelled)),
                 };
+                // Có slot → preset này bắt đầu chạy thật (queued → running).
+                store.mark_child_running(&job_id, &target.preset_id).await;
                 let res = render_preset_from_chain(
                     &store, &job_id, &target, &chain, &audio_path, &uploads, &frame,
                     &overlay_text_path, &wm_text_path, audio_info.duration, &options,
-                    &job_dir,
+                    &job_dir, out_stem.as_deref(), multi,
                 )
                 .await;
                 (target.preset_id.clone(), res)
@@ -751,6 +837,8 @@ pub async fn run_job(
             let options = options.clone();
             let job_dir = job_dir.clone();
             let sem = Arc::clone(&sem);
+            let out_stem = output_stem.clone();
+            let multi = targets.len() > 1;
             set.spawn(async move {
                 if is_cancelled(&store, &job_id).await {
                     return (target.preset_id.clone(), Err(PresetError::Cancelled));
@@ -759,10 +847,12 @@ pub async fn run_job(
                     Ok(p) => p,
                     Err(_) => return (target.preset_id.clone(), Err(PresetError::Cancelled)),
                 };
+                // Có slot → preset này bắt đầu chạy thật (queued → running).
+                store.mark_child_running(&job_id, &target.preset_id).await;
                 let res = render_preset_original(
                     &store, &job_id, &target, &clips, &audio_path, &uploads, &frame,
                     &overlay_text_path, &wm_text_path, audio_info.duration, &options,
-                    &job_dir,
+                    &job_dir, out_stem.as_deref(), multi,
                 )
                 .await;
                 (target.preset_id.clone(), res)
@@ -783,14 +873,18 @@ pub async fn run_job(
 
 
 
-    // 5. Zip nếu >= 2 file done.
+    // 5. Zip nếu >= 2 file done. Tên file zip tải về: "Tên sản phẩm".zip khi
+    //    người dùng đặt tên (job.zip tên vật lý trên đĩa giữ nguyên — route
+    //    download sẽ gắn Content-Disposition đúng).
+    //    Entry trong zip đặt THẲNG tên file output (đã chứa preset khi nhiều
+    //    preset) — không bọc thêm thư mục <preset>/ vì tên đã mang preset.
     if ok_outputs.len() >= 2 {
         let zip_path = job_dir.join("outputs.zip");
         let entries: Vec<(String, PathBuf)> = ok_outputs
             .iter()
-            .map(|(preset_id, p)| {
+            .map(|(_preset_id, p)| {
                 let name = p.file_name().unwrap_or_default().to_string_lossy().into_owned();
-                (format!("{preset_id}/{name}"), p.clone())
+                (name, p.clone())
             })
             .collect();
         let mut writer = crate::zipwriter::ZipWriter::new(std::io::BufWriter::new(
@@ -849,6 +943,42 @@ pub async fn run_job(
     tracing::info!(job = %job_id, "Job cha hoan tat: {} output", ok_outputs.len());
 }
 
+/// Xoá các thư mục job mồ côi trong `ws_dir` (mặc định `WORKSPACE_DIR`) —
+/// tàn dư của lần chạy trước bị kill đột ngột (mất điện, kill -9, crash).
+/// Được gọi NGAY lúc khởi động, trước khi nhận job mới: lúc này chưa có job
+/// nào đang chạy nên mọi thư mục con đều là rác an toàn để xoá (output tốt
+/// đã nằm trong library/). Trả về số thư mục đã xoá.
+pub fn cleanup_orphan_job_dirs() -> usize {
+    cleanup_orphans_in(std::path::Path::new(WORKSPACE_DIR))
+}
+
+/// Bản có tham số của [cleanup_orphan_job_dirs] — unit test dùng thư mục tạm.
+fn cleanup_orphans_in(ws_dir: &std::path::Path) -> usize {
+    let rd = match std::fs::read_dir(ws_dir) {
+        Ok(rd) => rd,
+        Err(e) => {
+            tracing::warn!("Không đọc được workspace để dọn mồ côi: {e}");
+            return 0;
+        }
+    };
+    let mut removed = 0usize;
+    for e in rd.flatten() {
+        let p = e.path();
+        if p.is_dir() {
+            match std::fs::remove_dir_all(&p) {
+                Ok(()) => removed += 1,
+                Err(err) => {
+                    tracing::warn!("Không dọn được thư mục mồ côi {}: {err}", p.display());
+                }
+            }
+        }
+    }
+    if removed > 0 {
+        tracing::info!("Đã dọn {removed} thư mục job mồ côi từ lần chạy trước.");
+    }
+    removed
+}
+
 /// Safe-zone của preset theo id (original/custom → None).
 fn registry_safe(registry: &Registry, preset_id: &str) -> Option<crate::presets::SafeZone> {
     // preset_id của custom là "custom_WxH" — không có trong registry.
@@ -883,6 +1013,10 @@ async fn drain_preset_results(
 ) -> Result<Option<Vec<(String, PathBuf)>>, String> {
     let mut ok_outputs: Vec<(String, PathBuf)> = Vec::new();
     let mut batch_cancelled = false;
+    // A2: danh sách tên hiển thị đã chiếm chỗ trong kho (toàn bộ library/) —
+    // nạp MỘT lần rồi thêm dần mỗi output, để " (2)", " (3)" không bao giờ
+    // ghi đè file cũ.
+    let mut taken_names: Vec<String> = library_taken_display_names();
     while let Some(joined) = set.join_next().await {
         let (preset_id, res) = match joined {
             Ok(v) => v,
@@ -893,9 +1027,24 @@ async fn drain_preset_results(
             }
         };
         match res {
-            Ok(out_path) => {
-                let filename =
+            Ok(mut out_path) => {
+                let mut filename =
                     out_path.file_name().unwrap_or_default().to_string_lossy().into_owned();
+                // Trùng tên trong kho → đổi thành "tên (2).mp4"… (đổi cả file
+                // trong workspace để child.filename / zip entry khớp tên tải về).
+                filename = crate::naming::unique_display_name(&filename, &taken_names);
+                taken_names.push(filename.clone());
+                if out_path.file_name().map(|n| n.to_string_lossy() != filename).unwrap_or(false) {
+                    let renamed = out_path
+                        .parent()
+                        .unwrap_or(std::path::Path::new("."))
+                        .join(&filename);
+                    if let Err(e) = tokio::fs::rename(&out_path, &renamed).await {
+                        tracing::warn!(job = %job_id, "Không đổi tên trùng: {e}");
+                    } else {
+                        out_path = renamed;
+                    }
+                }
                 // Lưu vào kho: library/<job_id>/<preset_id>__<filename>.
                 if let Err(e) = library_save(&job_id, &preset_id, &out_path) {
                     tracing::warn!(job = %job_id, "Không lưu vào kho: {e}");
@@ -908,6 +1057,18 @@ async fn drain_preset_results(
                         c.filename = Some(filename);
                     })
                     .await;
+                // A3: sau mỗi job con hoàn tất → dọn kho nếu vượt giới hạn.
+                // Bảo vệ: job cha này (và mọi job khác đang chạy) không bị xoá.
+                if let Some(settings) = store.settings_snapshot() {
+                    let mut protected = store.active_job_ids().await;
+                    if !protected.contains(&job_id.to_string()) {
+                        protected.push(job_id.to_string());
+                    }
+                    let res = crate::storage::enforce_library_limits(settings, protected).await;
+                    for w in &res.warnings {
+                        tracing::warn!("Dọn kho: {w}");
+                    }
+                }
             }
             Err(PresetError::Cancelled) => {
                 store
@@ -1227,9 +1388,35 @@ fn srt_time(sec: f64) -> String {
     format!("{:02}:{:02}:{:02},{:03}", ms / 3_600_000, ms / 60_000 % 60, ms / 1000 % 60, ms % 1000)
 }
 
+/// A2: mọi tên hiển thị (phần sau `__`) đang có trong kho library/ — dùng để
+/// né ghi đè khi output mới trùng tên. File vật lý dạng `<preset_id>__<tên>`;
+/// tên hiển thị mới do `unique_display_name` sinh cũng là tên tải về.
+fn library_taken_display_names() -> Vec<String> {
+    let mut names = Vec::new();
+    let lib = std::path::Path::new(LIBRARY_DIR);
+    let Ok(job_dirs) = std::fs::read_dir(lib) else {
+        return names;
+    };
+    for jd in job_dirs.flatten() {
+        let Ok(files) = std::fs::read_dir(jd.path()) else {
+            continue;
+        };
+        for f in files.flatten() {
+            if f.path().is_file() {
+                let name = f.file_name().to_string_lossy().into_owned();
+                names.push(match name.split_once("__") {
+                    Some((_, display)) => display.to_string(),
+                    None => name,
+                });
+            }
+        }
+    }
+    names
+}
+
 /// Copy output vào kho lưu trữ: ./library/<job_id>/<preset_id>__<filename>.
 fn library_save(job_id: &Uuid, preset_id: &str, out_path: &std::path::Path) -> Result<(), String> {
-    let dir = std::path::PathBuf::from("library").join(job_id.to_string());
+    let dir = std::path::PathBuf::from(LIBRARY_DIR).join(job_id.to_string());
     std::fs::create_dir_all(&dir).map_err(|e| format!("tạo thư mục kho: {e}"))?;
     let filename = out_path
         .file_name()
@@ -1373,6 +1560,10 @@ async fn render_preset_from_chain(
     audio_duration: f64,
     options: &JobOptions,
     job_dir: &std::path::Path,
+    // A2: "Tên sản phẩm" đã làm sạch (None → tên mặc định).
+    out_stem: Option<&str>,
+    // Job có nhiều preset → tên file kèm hậu tố preset_id.
+    multi: bool,
 ) -> Result<PathBuf, PresetError> {
     let sub = format!("preset {}", target.preset_id);
     let tid = target.preset_id.clone();
@@ -1392,7 +1583,7 @@ async fn render_preset_from_chain(
     ));
 
     // --- Pass cuối ---
-    let out_final = job_dir.join(output_filename(target));
+    let out_final = job_dir.join(output_filename(target, out_stem, multi));
     let args = build_final_args(
         chain,
         audio_path,
@@ -1427,6 +1618,10 @@ async fn render_preset_original(
     audio_duration: f64,
     options: &JobOptions,
     job_dir: &std::path::Path,
+    // A2: "Tên sản phẩm" đã làm sạch (None → tên mặc định).
+    out_stem: Option<&str>,
+    // Job có nhiều preset → tên file kèm hậu tố preset_id.
+    multi: bool,
 ) -> Result<PathBuf, PresetError> {
     let sub = format!("preset {}", target.preset_id);
     let tid = target.preset_id.clone();
@@ -1500,7 +1695,7 @@ async fn render_preset_original(
 
     // --- Bước 4: pass cuối ---
     let chain = single_source.as_deref().unwrap_or(&chain_path);
-    let out_final = job_dir.join(output_filename(target));
+    let out_final = job_dir.join(output_filename(target, out_stem, multi));
     let args = build_final_args(
         chain,
         audio_path,
@@ -1643,10 +1838,16 @@ fn out_duration_for(audio_duration: f64, max_duration_sec: Option<u64>) -> f64 {
 }
 
 /// Tên file output cho 1 preset: `radio_<preset>_<WxH>.mp4`.
-fn output_filename(target: &RenderTarget) -> String {
-    match (target.width, target.height) {
-        (Some(w), Some(h)) => format!("radio_{}_{}x{}.mp4", target.preset_id, w, h),
-        _ => format!("radio_{}.mp4", target.preset_id),
+/// Tên file output của 1 preset. Có "Tên sản phẩm" (`out_stem`) thì đặt theo
+/// quy tắc A2: `<tên>.mp4` (1 preset) / `<tên>_<preset_id>.mp4` (nhiều
+/// preset); không có thì giữ cách đặt tên mặc định cũ.
+fn output_filename(target: &RenderTarget, out_stem: Option<&str>, multi: bool) -> String {
+    match out_stem {
+        Some(stem) => crate::naming::preset_filename(stem, &target.preset_id, multi),
+        None => match (target.width, target.height) {
+            (Some(w), Some(h)) => format!("radio_{}_{}x{}.mp4", target.preset_id, w, h),
+            _ => format!("radio_{}.mp4", target.preset_id),
+        },
     }
 }
 
@@ -1743,6 +1944,182 @@ mod parallel_tests {
             let ncpu = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
             assert_eq!(max_parallel_presets(), (ncpu / 2).clamp(1, 4));
         }
+    }
+
+    // -----------------------------------------------------------------
+    // Hồi quy mục 3 (bản 0.4.1): vòng đời job con + tổng hợp job cha.
+    // -----------------------------------------------------------------
+
+    /// Job cha mẫu với 3 job con để tái dùng trong các test vòng đời.
+    fn job_with_children() -> Job {
+        let mk = |preset: &str| ChildJob {
+            preset_id: preset.into(),
+            label: preset.into(),
+            status: JobStatus::Queued,
+            progress: 0.0,
+            error: None,
+            filename: None,
+        };
+        Job {
+            id: Uuid::new_v4(),
+            status: JobStatus::Queued,
+            progress: 0.0,
+            error: None,
+            zip: None,
+            done_count: 0,
+            total_count: 0,
+            children: vec![mk("tiktok"), mk("fb"), mk("yt")],
+            cancel: None,
+            output_stem: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn child_lifecycle_queued_running_done() {
+        // Giả lập đúng trình tự run_job thật: con được slot → running,
+        // ffmpeg báo progress riêng → xong → done.
+        let store = JobStore::new();
+        let job = job_with_children();
+        let id = job.id;
+        store.insert(job).await;
+
+        // Đầu job: mọi con queued, cha queued, progress 0.
+        let st = store.get_status(&id).await.unwrap();
+        assert!(st.children.iter().all(|c| c.status == JobStatus::Queued));
+        assert_eq!(st.status, JobStatus::Queued);
+
+        // mark_child_running chỉ đúng con được slot; con khác vẫn queued.
+        store.mark_child_running(&id, "tiktok").await;
+        store.mark_child_running(&id, "fb").await;
+        let st = store.get_status(&id).await.unwrap();
+        assert_eq!(st.children[0].status, JobStatus::Running);
+        assert_eq!(st.children[1].status, JobStatus::Running);
+        assert_eq!(st.children[2].status, JobStatus::Queued);
+        // Cha chuyển running ngay khi có con chạy.
+        assert_eq!(st.status, JobStatus::Running);
+
+        // Progress từ ffmpeg chỉ cập nhật con đang chạy/đợi — con queued
+        // (chưa có slot) KHÔNG nhận progress của con khác.
+        store.set_child_progress(&id, "tiktok", 40.0).await;
+        let st = store.get_status(&id).await.unwrap();
+        assert_eq!(st.children[0].progress, 40.0);
+        assert_eq!(st.children[2].progress, 0.0);
+        // Progress cha = trung bình các con.
+        assert!((st.progress - 40.0 / 3.0).abs() < 1e-9);
+
+        // Con xong: done + progress chốt 100.
+        store
+            .update_child(&id, "tiktok", |c| {
+                c.status = JobStatus::Done;
+                c.progress = 100.0;
+                c.filename = Some("tiktok.mp4".into());
+            })
+            .await;
+        // Progress đến muộn sau khi done KHÔNG được ghi đè mốc 100.
+        store.set_child_progress(&id, "tiktok", 55.0).await;
+        let st = store.get_status(&id).await.unwrap();
+        assert_eq!(st.children[0].status, JobStatus::Done);
+        assert_eq!(st.children[0].progress, 100.0);
+
+        // Các con còn lại lần lượt done → cha done, progress 100.
+        store.update_child(&id, "fb", |c| c.status = JobStatus::Done).await;
+        store.update_child(&id, "yt", |c| c.status = JobStatus::Done).await;
+        let st = store.get_status(&id).await.unwrap();
+        assert_eq!(st.status, JobStatus::Done);
+        assert_eq!(st.done_count, 3);
+        assert_eq!(st.progress, 100.0);
+    }
+
+    #[tokio::test]
+    async fn child_error_partial_still_done_parent() {
+        // 1 con lỗi, 2 con tốt → cha done với thông báo "x/3 thành công".
+        let store = JobStore::new();
+        let job = job_with_children();
+        let id = job.id;
+        store.insert(job).await;
+        store.mark_child_running(&id, "tiktok").await;
+        store.mark_child_running(&id, "fb").await;
+        store.update_child(&id, "tiktok", |c| c.status = JobStatus::Done).await;
+        store
+            .update_child(&id, "fb", |c| {
+                c.status = JobStatus::Error;
+                c.error = Some("ffmpeg lỗi".into());
+            })
+            .await;
+        store.update_child(&id, "yt", |c| c.status = JobStatus::Done).await;
+        let st = store.get_status(&id).await.unwrap();
+        assert_eq!(st.status, JobStatus::Done);
+        assert_eq!(st.done_count, 2);
+        assert!(st.error.as_deref().unwrap_or("").contains("2/3"));
+    }
+
+    #[tokio::test]
+    async fn child_cancelled_marks_parent_cancelled() {
+        // Huỷ giữa chừng: con chưa chạy → cancelled, cha cancelled.
+        let store = JobStore::new();
+        let job = job_with_children();
+        let id = job.id;
+        store.insert(job).await;
+        store.mark_child_running(&id, "tiktok").await;
+        store.update_child(&id, "tiktok", |c| c.status = JobStatus::Done).await;
+        // cancel(): con queued → cancelled, cha → cancelled.
+        assert!(store.cancel(&id).await);
+        let st = store.get_status(&id).await.unwrap();
+        assert_eq!(st.status, JobStatus::Cancelled);
+        assert_eq!(st.children[1].status, JobStatus::Cancelled);
+        assert_eq!(st.children[2].status, JobStatus::Cancelled);
+        // Con đã done vẫn giữ done.
+        assert_eq!(st.children[0].status, JobStatus::Done);
+    }
+
+    #[tokio::test]
+    async fn running_child_not_demoted_by_late_progress() {
+        // Bất biến: progress callback trễ không được làm hỏng trạng thái con.
+        let store = JobStore::new();
+        let job = job_with_children();
+        let id = job.id;
+        store.insert(job).await;
+        store.mark_child_running(&id, "tiktok").await;
+        store.set_child_progress(&id, "tiktok", 99.0).await;
+        // mark_child_running lần 2 (idempotent) không đổi gì.
+        store.mark_child_running(&id, "tiktok").await;
+        let st = store.get_status(&id).await.unwrap();
+        assert_eq!(st.children[0].status, JobStatus::Running);
+        assert_eq!(st.children[0].progress, 99.0);
+    }
+
+    // -----------------------------------------------------------------
+    // Hồi quy mục 4 (bản 0.4.1): dọn workspace mồ côi lúc khởi động.
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn cleanup_orphans_removes_dirs_keeps_files() {
+        // Thư mục tạm mô phỏng workspace sau lần chạy bị kill: 2 thư mục job
+        // mồ côi + 1 file rác (file thường KHÔNG bị xoá vì không phải dir).
+        let ws = std::env::temp_dir().join(format!("rvm_test_ws_{}", Uuid::new_v4()));
+        std::fs::create_dir_all(ws.join("11111111-1111-1111-1111-111111111111/sub")).unwrap();
+        std::fs::create_dir_all(ws.join("22222222-2222-2222-2222-222222222222")).unwrap();
+        std::fs::write(ws.join("stray.txt"), "rác").unwrap();
+
+        let removed = cleanup_orphans_in(&ws);
+
+        assert_eq!(removed, 2, "phải xoá đúng 2 thư mục job mồ côi");
+        assert!(!ws.join("11111111-1111-1111-1111-111111111111").exists());
+        assert!(!ws.join("22222222-2222-2222-2222-222222222222").exists());
+        assert!(ws.join("stray.txt").exists(), "file thường nằm ngoài workspace/<job>/ không bị xoá");
+        assert!(ws.exists(), "bản thân workspace/ phải còn");
+        std::fs::remove_dir_all(&ws).ok();
+    }
+
+    #[test]
+    fn cleanup_orphans_empty_or_missing_dir() {
+        // Workspace trống → 0; workspace chưa tồn tại → 0, không panic.
+        let ws = std::env::temp_dir().join(format!("rvm_test_empty_{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&ws).unwrap();
+        assert_eq!(cleanup_orphans_in(&ws), 0);
+        std::fs::remove_dir_all(&ws).unwrap();
+        let missing = std::env::temp_dir().join(format!("rvm_test_missing_{}", Uuid::new_v4()));
+        assert_eq!(cleanup_orphans_in(&missing), 0);
     }
 }
 

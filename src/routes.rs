@@ -16,6 +16,7 @@ use uuid::Uuid;
 use crate::error::{AppError, AppResult};
 use crate::jobs::{ChildJob, Job, JobOptions, JobStatus, JobStore, Uploads, job_dir_abs, run_job};
 use crate::presets::Registry;
+use crate::storage::SettingsStore;
 use crate::STATIC_INDEX;
 
 /// Giới hạn upload: 4GB (tổng multipart).
@@ -25,6 +26,8 @@ const MAX_BODY_SIZE: usize = 4 * 1024 * 1024 * 1024;
 pub struct AppState {
     pub store: JobStore,
     pub registry: Registry,
+    /// A3: giới hạn lưu trữ kho video (settings.json + env override).
+    pub settings: SettingsStore,
 }
 
 pub fn router(state: AppState) -> Router {
@@ -39,13 +42,17 @@ pub fn router(state: AppState) -> Router {
         .route("/api/jobs/{id}/cancel", post(cancel_job))
         // Stream inline (hỗ trợ Range) — dùng cho player xem trước + thư viện.
         .route("/api/jobs/{id}/stream/{preset}", get(stream_child))
+        // A2: xem trước tên file output theo "Tên sản phẩm" + danh sách preset.
+        .route("/api/output-names", post(preview_output_names))
+        // A3: giới hạn lưu trữ kho video.
+        .route("/api/settings", get(get_settings).put(put_settings))
+        .route("/api/library/cleanup", post(cleanup_library))
         // Kho lưu trữ output đã xuất.
         .route("/api/library", get(list_library))
         .route("/api/library/{job}/{preset}/stream", get(library_stream))
         .route("/api/library/{job}/{preset}/download", get(library_download))
         .route("/api/library/{job}/{preset}", delete(library_delete))
         .layer(DefaultBodyLimit::max(MAX_BODY_SIZE))
-        .layer(tower_http::cors::CorsLayer::permissive())
         .with_state(state)
 }
 
@@ -60,6 +67,125 @@ async fn list_presets(
 /// GET /api/fonts — family các font hệ thống cho dropdown (fc-list).
 async fn list_fonts() -> Json<serde_json::Value> {
     Json(json!({ "fonts": list_system_fonts() }))
+}
+
+/// GET /api/settings — A3: giới hạn kho hiện tại + mức sử dụng thực tế.
+async fn get_settings(State(state): State<AppState>) -> AppResult<Json<serde_json::Value>> {
+    let s = state.settings.get().await;
+    let usage = crate::storage::library_usage().await;
+    Ok(Json(json!({
+        "library_max_gb": s.max_gb,
+        "library_max_files": s.max_files,
+        "library_used_bytes": usage.total_bytes,
+        "library_used_files": usage.total_files,
+    })))
+}
+
+/// PUT /api/settings — cập nhật giới hạn kho (body JSON 2 field, validate).
+async fn put_settings(
+    State(state): State<AppState>,
+    Json(body): Json<serde_json::Value>,
+) -> AppResult<Json<serde_json::Value>> {
+    let max_gb = body
+        .get("library_max_gb")
+        .and_then(|v| v.as_u64())
+        .ok_or_else(|| AppError::bad_request("Thiếu library_max_gb (số nguyên, 1–500)."))?;
+    let max_files = body
+        .get("library_max_files")
+        .and_then(|v| v.as_u64())
+        .ok_or_else(|| AppError::bad_request("Thiếu library_max_files (số nguyên, 10–5000)."))?
+        as usize;
+    crate::storage::validate_settings(max_gb, max_files).map_err(AppError::bad_request)?;
+    let s = crate::storage::LibrarySettings { max_gb, max_files };
+    state.settings.set(s).await.map_err(AppError::bad_request)?;
+    // Giới hạn mới chặt hơn → dọn kho về dưới ngưỡng mới ngay (không đợi job
+    // tiếp theo); job đang chạy được bảo vệ.
+    let protected = state.store.active_job_ids().await;
+    let res = crate::storage::enforce_library_limits(s, protected).await;
+    tracing::info!(
+        "Cập nhật giới hạn kho: {max_gb} GB / {max_files} file (dọn {} file)",
+        res.deleted
+    );
+    Ok(Json(json!({ "ok": true, "library_max_gb": max_gb, "library_max_files": max_files })))
+}
+
+/// POST /api/library/cleanup — A3: nút "Dọn ngay": xoá file cũ nhất cho đến
+/// khi kho còn 70% giới hạn. Trả về số file xoá + byte giải phóng.
+async fn cleanup_library(State(state): State<AppState>) -> AppResult<Json<serde_json::Value>> {
+    let s = state.settings.get().await;
+    let protected = state.store.active_job_ids().await;
+    let res = crate::storage::cleanup_library_to_ratio(s, 0.7, protected).await;
+    Ok(Json(json!({
+        "deleted": res.deleted,
+        "freed_bytes": res.freed_bytes,
+        "kept_bytes": res.kept_bytes,
+        "kept_files": res.kept_files,
+        "warnings": res.warnings,
+    })))
+}
+
+/// POST /api/output-names — A2: xem trước tên file output sẽ nhận được.
+/// Body: `{ "output_name": "…", "strip": bool, "presets": ["tiktok_9x16", …] }`.
+/// Trả về `{ "stem": …, "fallback": bool, "files": [{preset_id, name}], "zip": … }`
+/// — UI hiển thị trực tiếp, người dùng biết chính xác tên file cuối.
+async fn preview_output_names(
+    State(state): State<AppState>,
+    Json(body): Json<serde_json::Value>,
+) -> AppResult<Json<serde_json::Value>> {
+    let name = body.get("output_name").and_then(|v| v.as_str()).unwrap_or("");
+    let strip = body
+        .get("strip")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    // Danh sách preset id (giới hạn 8 như tạo job thật).
+    let presets: Vec<String> = body
+        .get("presets")
+        .and_then(|v| v.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|p| p.as_str().map(|s| s.to_string()))
+                .take(8)
+                .collect()
+        })
+        .unwrap_or_default();
+
+    match crate::naming::resolve_stem(name, strip) {
+        Some(stem) => {
+            let multi = presets.len() > 1;
+            let files: Vec<serde_json::Value> = if presets.is_empty() {
+                Vec::new()
+            } else {
+                presets
+                    .iter()
+                    .map(|p| {
+                        json!({
+                            "preset_id": p,
+                            // Preset lạ/không resolve được vẫn hiện đúng
+                            // quy tắc tên (UI đã có id từ /api/presets).
+                            "name": crate::naming::preset_filename(&stem, p, multi),
+                        })
+                    })
+                    .collect()
+            };
+            Ok(Json(json!({
+                "stem": stem,
+                "fallback": false,
+                "files": files,
+                "zip": if multi { Some(crate::naming::zip_filename(&stem)) } else { None },
+            })))
+        }
+        // Rỗng sau khi làm sạch → tên mặc định theo preset (fallback=true để
+        // UI gợi ý "để trống = tên mặc định").
+        None => {
+            let _ = state.registry; // registry không cần ở nhánh này
+            Ok(Json(json!({
+                "stem": serde_json::Value::Null,
+                "fallback": true,
+                "files": [],
+                "zip": serde_json::Value::Null,
+            })))
+        }
+    }
 }
 
 /// Liệt kê family font hệ thống — ủy quyền cho module fontconfig
@@ -116,7 +242,12 @@ async fn create_job(
         // client thực sự gửi — tránh âm lượng ngoài khoảng bị bỏ qua im lặng.
         let mut options = options;
         options.audio = Some(options.audio());
-        let audio = options.audio.as_ref().expect("đã set ở dòng trên");
+        // audio() luôn trả về giá trị hợp lệ (fallback default) nên as_ref
+        // không bao giờ None — nhưng lấy lỗi rõ ràng thay vì panic nếu có sửa
+        // đổi trong tương lai làm hỏng bất biến này.
+        let Some(audio) = options.audio.as_ref() else {
+            return Err(AppError::bad_request("Tuỳ chọn audio không hợp lệ."));
+        };
         if !(0.0..=200.0).contains(&audio.volume) {
             return Err(AppError::bad_request("Âm lượng phải từ 0 đến 200%."));
         }
@@ -174,6 +305,51 @@ async fn create_job(
             }
         }
 
+        // A3: kiểm tra đĩa trước khi render — cần ước tính tổng input × 3
+        // (chuẩn hoá + ghép + output). Thiếu chỗ → từ chối ngay, báo số GB
+        // còn/cần để người dùng tự dọn hoặc chọn preset gọn hơn.
+        {
+            let mut input_bytes: u64 = 0;
+            for p in video_paths.iter().chain(audio_paths.iter()) {
+                if let Ok(m) = tokio::fs::metadata(p).await {
+                    input_bytes += m.len();
+                }
+            }
+            if let Some(p) = uploads.subtitle.as_ref() {
+                if let Ok(m) = tokio::fs::metadata(p).await {
+                    input_bytes += m.len();
+                }
+            }
+            if let Some(p) = uploads.logo.as_ref() {
+                if let Ok(m) = tokio::fs::metadata(p).await {
+                    input_bytes += m.len();
+                }
+            }
+            for p in uploads.fonts.values() {
+                if let Ok(m) = tokio::fs::metadata(p).await {
+                    input_bytes += m.len();
+                }
+            }
+            let need_bytes = input_bytes.saturating_mul(3);
+            match crate::storage::disk_free_bytes(std::path::Path::new(".")) {
+                Ok(free) if free < need_bytes => {
+                    let free_gb = free as f64 / 1e9;
+                    let need_gb = need_bytes as f64 / 1e9;
+                    return Err(AppError::bad_request(format!(
+                        "Ổ đĩa không đủ chỗ: cần khoảng {need_gb:.1} GB (tổng input × 3 cho \
+                         file trung gian + output) nhưng chỉ còn {free_gb:.1} GB trống. Hãy xoá \
+                         bớt file ở Kho video hoặc chọn preset nhỏ hơn."
+                    )));
+                }
+                Ok(_) => {}
+                // Không đọc được dung lượng đĩa (filesystem lạ) → không chặn
+                // job vì một phép đo hỏng; log để debug.
+                Err(e) => {
+                    tracing::warn!("Không đọc được dung lượng đĩa: {e}");
+                }
+            }
+        }
+
         // Resolve trước để lỗi preset hiện ngay trong response.
         let mut children: Vec<ChildJob> = Vec::new();
         let mut seen = std::collections::HashSet::new();
@@ -219,6 +395,12 @@ async fn create_job(
     };
 
     let total = children.len();
+    // A2: làm sạch "Tên sản phẩm" NGAY lúc tạo job (giá trị hiển thị preview
+    // và tên file zip cần thống nhất từ đầu).
+    let output_stem = options
+        .output_name
+        .as_deref()
+        .and_then(|n| crate::naming::resolve_stem(n, options.output_name_strip));
     let job = Job {
         id: job_id,
         status: JobStatus::Queued,
@@ -229,6 +411,7 @@ async fn create_job(
         total_count: total,
         children,
         cancel: None,
+        output_stem,
     };
     state.store.insert(job).await;
 
@@ -385,9 +568,15 @@ async fn download_job(
 ) -> AppResult<Response> {
     let uuid = parse_uuid(&id)?;
 
-    // Ưu tiên zip khi có nhiều output.
+    // Ưu tiên zip khi có nhiều output. Tên tải về: "Tên sản phẩm".zip nếu
+    // người dùng đặt tên (A2), không thì giữ tên cũ.
     if let Some(zip_path) = state.store.get_zip(&uuid).await {
-        return serve_file(&zip_path, "radio_outputs.zip", "application/zip").await;
+        let zip_name = state
+            .store
+            .get_output_zip_name(&uuid)
+            .await
+            .unwrap_or_else(|| "radio_outputs.zip".to_string());
+        return serve_file(&zip_path, &zip_name, "application/zip").await;
     }
 
     // Fallback: file output đầu tiên (nếu chỉ 1 preset).
@@ -399,7 +588,11 @@ async fn download_job(
     let Some(child) = status.children.iter().find(|c| c.filename.is_some()) else {
         return Err(AppError::not_found("Job chưa có file output nào."));
     };
-    let filename = child.filename.clone().unwrap();
+    // find() ở trên đã lọc c.filename.is_some() nên luôn lấy được tên file;
+    // clone() không panic được nhưng vẫn xử lý None đề phòng bất biến bị phá.
+    let Some(filename) = child.filename.clone() else {
+        return Err(AppError::not_found("Job chưa có file output nào."));
+    };
     // Workspace truoc, library sau (job cu da don workspace).
     let mut path = job_dir_abs(&uuid).join(&filename);
     if !tokio::fs::try_exists(&path).await.unwrap_or(false) {
@@ -421,12 +614,19 @@ async fn download_child(
         .get_child_output(&uuid, &preset)
         .await
         .ok_or_else(|| AppError::not_found("Không tìm thấy output của preset này."))?;
-    let filename = path
-        .file_name()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .into_owned();
-    serve_file(&path, &filename, "video/mp4").await
+    // A2: tên tải về dùng tên hiển thị người dùng đặt (child.filename), KHÔNG
+    // dùng tên vật lý trong kho `<preset_id>__<tên>` khi rơi về fallback.
+    let display = state
+        .store
+        .get_child_display_name(&uuid, &preset)
+        .await
+        .unwrap_or_else(|| {
+            path.file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .into_owned()
+        });
+    serve_file(&path, &display, "video/mp4").await
 }
 
 async fn serve_file(path: &std::path::Path, filename: &str, mime: &str) -> AppResult<Response> {
@@ -444,9 +644,11 @@ async fn serve_file(path: &std::path::Path, filename: &str, mime: &str) -> AppRe
             _ => "video/mp4",
         }),
     );
+    // A2: filename ASCII fallback + filename* UTF-8 percent-encode → trình
+    // duyệt hiện đúng tên tiếng Việt khi tải về.
     headers.insert(
         header::CONTENT_DISPOSITION,
-        header::HeaderValue::from_str(&format!("attachment; filename=\"{filename}\""))
+        header::HeaderValue::from_str(&crate::naming::content_disposition(true, filename))
             .map_err(|_| AppError::internal("Tên file không hợp lệ"))?,
     );
 
@@ -503,18 +705,14 @@ async fn serve_video_range(
         .await
         .map_err(|e| AppError::internal(format!("Không mở được file: {e}")))?;
 
-    let disp = if download {
-        format!("attachment; filename=\"{filename}\"")
-    } else {
-        "inline".to_string()
-    };
-
     let mut headers = HeaderMap::new();
     headers.insert(header::CONTENT_TYPE, header::HeaderValue::from_static("video/mp4"));
     headers.insert(header::ACCEPT_RANGES, header::HeaderValue::from_static("bytes"));
+    // A2: kèm filename* UTF-8 để tên tải về giữ dấu tiếng Việt.
     headers.insert(
         header::CONTENT_DISPOSITION,
-        header::HeaderValue::from_str(&disp).map_err(|_| AppError::internal("Tên file lỗi"))?,
+        header::HeaderValue::from_str(&crate::naming::content_disposition(download, filename))
+            .map_err(|_| AppError::internal("Tên file lỗi"))?,
     );
 
     // Range hợp lệ → 206 + đúng đoạn; không có/không hợp lệ → cả file (200).
@@ -623,7 +821,10 @@ async fn list_library(State(_state): State<AppState>) -> AppResult<Json<serde_js
         for f in files {
             let name = f.file_name().to_string_lossy().into_owned();
             // Tên file: <preset_id>__<filename gốc>.
-            let (preset_id, _) = name.split_once("__").unwrap_or((name.as_str(), ""));
+            let (preset_id, display) = name
+                .split_once("__")
+                .unwrap_or((name.as_str(), name.as_str()));
+            let display = display.to_string();
             // std::fs::metadata (path) — sync nhưng nhẹ, gọi 1 lần/file.
             let meta = std::fs::metadata(f.path()).ok();
             let size = meta.as_ref().map(|m| m.len()).unwrap_or(0);
@@ -637,6 +838,8 @@ async fn list_library(State(_state): State<AppState>) -> AppResult<Json<serde_js
                 "job_id": job_id,
                 "preset_id": preset_id,
                 "file": name,
+                // A2: tên hiển thị cho UI (phần sau "__").
+                "display_name": display,
                 "size": size,
                 "modified": modified,
                 "url_stream": format!("/api/library/{job_id}/{preset_id}/stream?file={}", urlencode(&name)),
@@ -672,17 +875,16 @@ async fn serve_library(
     inline: bool,
     req_headers: HeaderMap,
 ) -> AppResult<Response> {
-    // Chống path traversal: chỉ chấp nhận tên đã sanitize (giống lúc liệt kê).
+    // A2: chặn path traversal nhưng GIỮ nguyên Unicode (tên file có dấu
+    // tiếng Việt phải tra cứu được; sanitize ASCII cũ làm sai tên).
     let (job, preset) = (sanitize_filename(&job), sanitize_filename(&preset));
     let file_param = q
         .as_deref()
         .and_then(|s| s.strip_prefix("file="))
         .map(urldecode)
         .unwrap_or_default();
-    let file_name = sanitize_filename(&file_param);
-    if file_name.is_empty() {
-        return Err(AppError::bad_request("Thiếu tham số file."));
-    }
+    let file_name = crate::naming::safe_lookup_name(&file_param)
+        .ok_or_else(|| AppError::bad_request("Tên file không hợp lệ."))?;
     let path = std::path::PathBuf::from("library")
         .join(&job)
         .join(&file_name);
@@ -714,10 +916,9 @@ async fn library_delete(
         .and_then(|s| s.strip_prefix("file="))
         .map(urldecode)
         .unwrap_or_default();
-    let file_name = sanitize_filename(&file_param);
-    if file_name.is_empty() {
-        return Err(AppError::bad_request("Thiếu tham số file."));
-    }
+    // A2: như serve_library — chặn traversal, giữ Unicode.
+    let file_name = crate::naming::safe_lookup_name(&file_param)
+        .ok_or_else(|| AppError::bad_request("Tên file không hợp lệ."))?;
     let path = std::path::PathBuf::from("library").join(&job).join(&file_name);
     if !path.exists() {
         return Err(AppError::not_found("File không còn trong kho."));
@@ -791,6 +992,14 @@ async fn cancel_job(
 ) -> AppResult<Json<serde_json::Value>> {
     let uuid = parse_uuid(&id)?;
     if state.store.cancel(&uuid).await {
+        // A3: huỷ xong → xoá ngay thư mục input/trung gian của job (không
+        // đợi tắt app) — fail() đã dọn cho job lỗi, đây là nhánh huỷ.
+        let dir = job_dir_abs(&uuid);
+        if let Err(e) = tokio::fs::remove_dir_all(&dir).await {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                tracing::warn!(job = %uuid, "Không dọn được job dir sau huỷ: {e}");
+            }
+        }
         Ok(Json(json!({ "cancelled": true })))
     } else {
         Ok(Json(json!({

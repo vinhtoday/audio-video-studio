@@ -522,6 +522,8 @@ pub fn drawtext_color(color: &str, alpha: f64) -> String {
 }
 
 /// Màu cho ASS `PrimaryColour`: "#RRGGBB" → "&H00BBGGRR&".
+/// Kịch bản cảnh chữ: backend sẵn sàng, chưa có nút UI — dành cho bản sau.
+#[allow(dead_code)]
 pub fn ass_color(color: &str) -> String {
     match parse_hex_color(color) {
         Some((r, g, b)) => format!("&H00{b:02X}{g:02X}{r:02X}&"),
@@ -965,6 +967,8 @@ pub fn text_items(t: &TextOverlayOptions, font: &ResolvedFont, frame: &FrameCtx)
 /// `[mm:ss-mm:ss] nội dung` · `[mm:ss] nội dung` · `mm:ss | nội dung` ·
 /// `90 | nội dung` (giây). Dòng không có mốc thời gian đứng ĐẦU tiên = cảnh
 /// hiện từ đầu video; đứng sau thì nối tiếp nội dung cảnh trước (nhiều dòng).
+/// Kịch bản cảnh chữ: backend sẵn sàng, chưa có nút UI — dành cho bản sau.
+#[allow(dead_code)]
 pub fn parse_scene_script(script: &str) -> Vec<TextScene> {
     let mut scenes: Vec<TextScene> = Vec::new();
     for raw in script.lines() {
@@ -994,6 +998,8 @@ pub fn parse_scene_script(script: &str) -> Vec<TextScene> {
 }
 
 /// Bỏ dấu đầu dòng kiểu danh sách: "- ", "* ", "• ", "1. ", "1) ".
+/// Kịch bản cảnh chữ: backend sẵn sàng, chưa có nút UI — dành cho bản sau.
+#[allow(dead_code)]
 fn strip_list_marker(line: &str) -> &str {
     if let Some(rest) = ["- ", "* ", "• "].iter().find_map(|m| line.strip_prefix(*m)) {
         return rest.trim_start();
@@ -1011,6 +1017,8 @@ fn strip_list_marker(line: &str) -> &str {
 }
 
 /// Tách "[mm:ss-mm:ss] nội dung" / "[mm:ss] nội dung" / "mm:ss | nội dung".
+/// Kịch bản cảnh chữ: backend sẵn sàng, chưa có nút UI — dành cho bản sau.
+#[allow(dead_code)]
 fn split_time_prefix(line: &str) -> Option<((f64, Option<f64>), &str)> {
     if let Some(rest) = line.strip_prefix('[') {
         let close = rest.find(']')?;
@@ -1024,6 +1032,8 @@ fn split_time_prefix(line: &str) -> Option<((f64, Option<f64>), &str)> {
 }
 
 /// "mm:ss-mm:ss" → (bắt đầu, Some(kết thúc)); "mm:ss" → (giây, None).
+/// Kịch bản cảnh chữ: backend sẵn sàng, chưa có nút UI — dành cho bản sau.
+#[allow(dead_code)]
 fn parse_time_span(s: &str) -> Option<(f64, Option<f64>)> {
     let s = s.trim();
     if let Some((i, c)) = s.char_indices().find(|(_, c)| matches!(c, '-' | '–' | '→')) {
@@ -1035,6 +1045,8 @@ fn parse_time_span(s: &str) -> Option<(f64, Option<f64>)> {
 }
 
 /// "90" / "90.5" / "mm:ss" / "h:mm:ss" → giây.
+/// Kịch bản cảnh chữ: backend sẵn sàng, chưa có nút UI — dành cho bản sau.
+#[allow(dead_code)]
 fn parse_clock(s: &str) -> Option<f64> {
     let nums: Vec<f64> = s.trim().split(':').map(|p| p.trim().parse::<f64>().ok()).collect::<Option<Vec<_>>>()?;
     if nums.iter().any(|n| !n.is_finite() || *n < 0.0) {

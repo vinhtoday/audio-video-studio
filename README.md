@@ -2,7 +2,7 @@
 
 **Ghép audio radio vào video và xuất đồng loạt cho mọi nền tảng — TikTok, Reels, YouTube Shorts, Facebook, Instagram, Threads, X — chỉ bằng 1 cú bấm.**
 
-Web app chạy local (Rust + Axum + FFmpeg): tải binary về, mở trình duyệt, dùng. Không cloud — toàn bộ xử lý trên máy bạn, không có file nào được gửi đi đâu.
+Web app chạy local (Rust + Axum + FFmpeg): tải binary về, mở trình duyệt, dùng. Toàn bộ xử lý video/audio chạy trên máy bạn. **Ngoại lệ duy nhất:** tính năng **phụ đề tự động (ASR)** gửi đoạn audio tới dịch vụ nhận dạng giọng nói online của z.ai (xem [Phụ đề tự động chạy thế nào](#-phụ-đề-tự-động-chạy-thế-nào)) — nếu không bật tính năng này thì không có file nào rời khỏi máy.
 
 ![Giao diện tối](docs/screenshot-dark.png)
 
@@ -15,11 +15,13 @@ Web app chạy local (Rust + Axum + FFmpeg): tải binary về, mở trình duy�
 | 🔀 **Chuyển cảnh** | xfade giữa các clip: fade / smoothleft / circleopen / dissolve, thời lượng 0–1s. |
 | 🎞️ **3 chế độ khớp khung** | Che lấp (crop) · viền đen (pad) · nền mờ (blur). |
 | ✍️ **Chữ overlay** | Tiêu đề chương trình: font hệ thống hoặc upload `.ttf`/`.otf`, cỡ/màu/viền, vị trí trên/giữa/dưới, hẹn giờ hiện từ–đến. Escape an toàn `:` `'` `\` `%` + UTF-8 tiếng Việt. |
-| 💬 **Phụ đề burn-in** | **Tự động nhận diện giọng nói (ASR)** sinh phụ đề — hoặc dùng tệp `.srt` sẵn. Màu hex tự đổi sang ASS `&H00BBGGRR&`. |
+| 💬 **Phụ đề burn-in** | **Tự động nhận diện giọng nói (ASR — dùng dịch vụ online)** sinh phụ đề — hoặc dùng tệp `.srt` sẵn. Màu hex tự đổi sang ASS `&H00BBGGRR&`. |
 | 💧 **Watermark** | Tên kênh (text) hoặc logo PNG/JPG/WEBP; 5 vị trí, độ đục, lề; chế độ **di chuyển 4 góc chống crop**; tự né **safe-zone** từng nền tảng. |
 | 🎚️ **Audio** | Âm lượng 0–200%, fade-out cuối bài, chế độ nhanh (giữ codec). Bật lớp overlay thì fast-mode tự tắt (filter buộc re-encode) — UI cảnh báo ngay. |
 | 👀 **Xem trước trực tiếp** | Khung đúng tỉ lệ preset + safe-zone + chữ + watermark render bằng CSS ngay trong app, chưa cần ffmpeg. |
 | 📼 **Kho video** | Section cuối trang, tự nạp sau mỗi lần xuất: xem trực tiếp (stream hỗ trợ Range/seek), tải xuống, xoá. |
+| 🗄️ **Giới hạn lưu trữ** (A3) | Kho video mặc định **5 GB / 200 file** (sửa trong UI hoặc `settings.json`; env `RVM_LIBRARY_MAX_GB`, `RVM_LIBRARY_MAX_FILES` ghi đè). Vượt ngưỡng → tự xoá file **cũ nhất** (sau mỗi job + lúc khởi động), không bao giờ đụng file job đang chạy; file đơn lớn hơn giới hạn được giữ lại + cảnh báo. Thanh dung lượng cảnh báo màu khi ≥ 80%; nút **Dọn ngay** xoá về 70% có xác nhận. Trước khi render, kiểm tra đĩa còn `tổng input × 3` — thiếu chỗ thì từ chối job với số GB còn/cần (statvfs / Windows API). |
+| 🏷️ **Tên sản phẩm** (A2) | Nhập tên ở bước Xuất → file tải về mang đúng tên đó: 1 preset `<tên>.mp4`, nhiều preset `<tên>_<preset>.mp4` + zip `<tên>.zip`. Làm sạch an toàn (NFC, ≤100 ký tự, xoá ký tự cấm, né tên Windows như `CON`); tuỳ chọn **bỏ dấu tiếng Việt** (`Kem chống nắng` → `Kem-chong-nang`). Trùng tên trong kho tự thành ` (2)`, ` (3)` — không bao giờ ghi đè. Header tải về dùng `filename` + `filename*` RFC 6266 nên trình duyệt hiện đúng dấu tiếng Việt. |
 | 🌗 **Giao diện** | Dark/Light theo hệ điều hành, responsive từ 375px, tiếng Việt, **1 luồng tuyến tính 5 bước** (Nguồn → Nền tảng → Xem trước → Tuỳ chọn → Xuất) + kho video ở cuối — chỉ đúng 1 nút Xuất trên toàn trang. |
 
 ### Xử lý "cứng" các edge-case thực tế
@@ -45,7 +47,7 @@ Web app chạy local (Rust + Axum + FFmpeg): tải binary về, mở trình duy�
   | macOS | `brew install ffmpeg` |
   | Linux (Debian/Ubuntu) | `sudo apt install ffmpeg` |
 
-- [Rust](https://rustup.rs/) 1.75+ — **chỉ cần khi build từ source**.
+- [Rust](https://rustup.rs/) 1.78+ — **chỉ cần khi build từ source** (Cargo.lock v4 cần cargo ≥ 1.78).
 
 ### Từ source
 
@@ -60,12 +62,33 @@ cargo run --release
 
 ```bash
 RVM_PORT=8080 ./radio-video-merger            # đổi cổng (mặc định 3000)
+RVM_HOST=0.0.0.0 ./radio-video-merger         # mở cho máy khác trong LAN
+                                              # (mặc định 127.0.0.1 — chỉ máy mình)
 RVM_MAX_PARALLEL=2 ./radio-video-merger       # giới hạn render song song
 RVM_FFMPEG_PATH=/path/ffmpeg \
 RVM_FFPROBE_PATH=/path/ffprobe ./radio-video-merger   # ffmpeg đặt chỗ khác
 ```
 
 Frontend nhúng thẳng trong binary — 1 file chạy được, không cần nginx.
+
+## ☁️ Phụ đề tự động chạy thế nào
+
+Tính năng **"✨ Tự động (nhận diện giọng nói)"** KHÔNG chạy local: app tách
+audio thành các đoạn 30 giây, rồi gọi CLI `z-ai` (SDK `z-ai-web-dev-sdk`) —
+CLI này đọc file audio, **mã hoá base64 và gửi lên dịch vụ nhận dạng giọng
+nói online của z.ai** (`POST <baseUrl>/audio/asr`, địa chỉ dịch vụ nằm trong
+file cấu hình `.z-ai-config` của máy chạy app) rồi nhận lại văn bản. Nghĩa là:
+
+- **Đoạn audio radio của bạn được gửi ra internet** tới dịch vụ ASR khi (và
+  chỉ khi) bạn bật chế độ phụ đề tự động.
+- Máy chạy app cần cài `z-ai` CLI và có file cấu hình `.z-ai-config` hợp lệ
+  (có `baseUrl` + `apiKey`), nếu không tính năng sẽ báo lỗi "không chạy được
+  z-ai" và job phụ đề tự động thất bại (các phần khác vẫn chạy bình thường).
+- Không muốn gửi dữ liệu đi? Dùng tệp `.srt` sẵn — toàn bộ phần còn lại của
+  app (ghép video, render, encode…) chạy 100% trên máy bạn bằng FFmpeg.
+
+UI đã gắn nhãn **"Dùng dịch vụ online"** cạnh nút bật ASR để người dùng biết
+trước khi chọn.
 
 ## 🧩 Kiến trúc & pipeline
 

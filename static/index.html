@@ -250,6 +250,22 @@
   .lib-head-btn { margin-left: auto; font-size: .78rem; padding: 5px 12px; border-radius: 8px;
     border: 1px solid var(--line-strong); background: var(--panel-2); color: var(--teal); cursor: pointer; }
   .lib-head-btn:hover { border-color: var(--teal); }
+  /* A3: thanh dung lượng kho + công cụ giới hạn. */
+  .lib-storage { margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--line);
+    border-radius: var(--r-sm); background: var(--panel-2); }
+  .lib-storage-row { display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; flex-wrap: wrap; font-size: .8rem; }
+  .lib-storage-row label { color: var(--dim); font-size: .78rem; }
+  .lib-storage-tools { display: flex; align-items: center; gap: 6px; }
+  .lib-storage-tools input { width: 64px; padding: 4px 8px; font: inherit; font-size: .78rem;
+    border: 1px solid var(--line-strong); border-radius: 6px; background: var(--panel); color: var(--text); }
+  .lib-storage-bar { height: 8px; border-radius: 4px; background: var(--line); margin-top: 8px;
+    overflow: hidden; }
+  .lib-storage-fill { height: 100%; width: 0%; border-radius: 4px;
+    background: linear-gradient(90deg, var(--teal), #34d399); transition: width .3s; }
+  .lib-storage-fill.warn { background: linear-gradient(90deg, #f59e0b, #f97316); }
+  .lib-storage-fill.danger { background: linear-gradient(90deg, #ef4444, #dc2626); }
+  .lib-storage-warn { margin-top: 8px; font-size: .78rem; color: #f59e0b; }
   .out-view-btn { font-size: .74rem; padding: 3px 10px; border-radius: 8px; border: 1px solid var(--line-strong);
     background: var(--panel-2); color: var(--teal); cursor: pointer; }
   .out-view-btn:hover { border-color: var(--teal); }
@@ -694,7 +710,7 @@
           <div class="field full">
             <label>Nguồn phụ đề</label>
             <div class="seg-row" id="sub-source-row" style="display:flex;gap:8px;flex-wrap:wrap;">
-              <button type="button" class="seg-btn selected" data-subsrc="auto">✨ Tự động (nhận diện giọng nói)</button>
+              <button type="button" class="seg-btn selected" data-subsrc="auto">✨ Tự động (nhận diện giọng nói) · Dùng dịch vụ online</button>
               <button type="button" class="seg-btn" data-subsrc="file">📄 Tệp .srt</button>
             </div>
           </div>
@@ -704,7 +720,7 @@
             <div class="file-badge" id="sub-file-badge" hidden></div>
           </div>
           <div class="field full" id="sub-auto-note" style="color:var(--dim);font-size:.78rem;">
-            ASR tự nghe audio rồi sinh phụ đề khi xuất (không cần tải tệp). Audio nhạc thuần có thể không ra chữ.
+            ASR tự nghe audio rồi sinh phụ đề khi xuất (không cần tải tệp). Audio nhạc thuần có thể không ra chữ. <b>Lưu ý: dùng dịch vụ online — đoạn audio được gửi lên máy chủ nhận dạng giọng nói của z.ai để nhận diện; không muốn gửi dữ liệu đi thì dùng tệp .srt.</b>
           </div>
           <div class="field">
             <label for="sub-size">Cỡ chữ px @1080 — <span class="value" id="sub-size-value">52</span></label>
@@ -834,6 +850,14 @@
         <div class="sec-title">Xuất video</div>
         <div class="sec-hint" id="export-hint">cần ít nhất 1 video + audio + 1 preset</div>
       </div>
+      <div class="field full" id="output-name-field" style="margin-bottom:10px;">
+        <label for="opt-name">Tên sản phẩm / tên file</label>
+        <input type="text" id="opt-name" placeholder="VD: Kem chống nắng — để trống thì đặt tên mặc định" maxlength="120" autocomplete="off">
+        <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:.8rem;">
+          <input type="checkbox" id="opt-name-strip" style="vertical-align:-2px;">Bỏ dấu tiếng Việt (Kem chống nắng → Kem-chong-nang)
+        </label>
+        <div class="file-badge" id="name-preview" style="background:rgba(99,102,241,.08);color:var(--accent);white-space:normal;"></div>
+      </div>
       <div class="export-actions">
         <button class="btn btn-primary" id="btn-export" disabled>🚀 Xuất video</button>
         <button class="btn btn-ghost" id="btn-cancel" style="display:none;">Huỷ</button>
@@ -854,6 +878,19 @@
         <div class="sec-no" style="background:rgba(45,212,191,.12);color:var(--teal);border-color:rgba(45,212,191,.3);">📼</div>
         <div class="sec-title">Kho video đã xuất</div>
         <button class="lib-head-btn" id="lib-refresh" type="button">↻ Làm mới</button>
+      </div>
+      <div id="lib-storage" class="lib-storage">
+        <div class="lib-storage-row">
+          <span id="lib-usage-text">Đang tải dung lượng kho…</span>
+          <span class="lib-storage-tools">
+            <label for="lib-max-gb" style="white-space:nowrap;">Giới hạn</label>
+            <input type="number" id="lib-max-gb" min="1" max="500" step="1" style="width:64px;"> GB
+            <button class="lib-head-btn" id="lib-save-limit" type="button">Lưu</button>
+            <button class="lib-head-btn" id="lib-cleanup" type="button">🧹 Dọn ngay</button>
+          </span>
+        </div>
+        <div class="lib-storage-bar"><div class="lib-storage-fill" id="lib-usage-fill"></div></div>
+        <div class="lib-storage-warn" id="lib-usage-warn" hidden></div>
       </div>
       <div class="lib-list" id="lib-list"></div>
     </div>
@@ -1030,6 +1067,51 @@
     updateOverlayPreview();
     updateStats();
     refreshExportButton();
+    scheduleNamePreview(); // A2: đổi preset → đổi quy tắc tên file
+  }
+
+  // A2: xem trước tên file output theo "Tên sản phẩm" + preset đang chọn.
+  // Debounce 250ms để không spam API khi gõ; lỗi mạng → im lặng giữ gợi ý cũ.
+  let namePreviewTimer = null;
+  function scheduleNamePreview() {
+    if (namePreviewTimer) clearTimeout(namePreviewTimer);
+    namePreviewTimer = setTimeout(updateNamePreview, 250);
+  }
+
+  async function updateNamePreview() {
+    const box = $("name-preview");
+    if (!box) return;
+    const name = $("opt-name").value.trim();
+    const strip = $("opt-name-strip").checked;
+    const presets = [...state.selectedPresets];
+    if (!name) {
+      box.hidden = false;
+      box.textContent = presets.length
+        ? "Để trống → dùng tên mặc định (radio_<preset>)."
+        : "Để trống → dùng tên mặc định (radio_<preset>). Chọn preset để xem tên cụ thể.";
+      return;
+    }
+    try {
+      const res = await fetch("/api/output-names", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ output_name: name, strip, presets }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.fallback) {
+        box.textContent = "Tên sau khi làm sạch rỗng → dùng tên mặc định.";
+        return;
+      }
+      const parts = [];
+      if (presets.length <= 1) {
+        parts.push(data.files.length ? `📁 ${data.files[0].name}` : `📁 ${data.stem}.mp4`);
+      } else {
+        for (const f of data.files) parts.push(`📁 ${f.name}`);
+        if (data.zip) parts.push(`🗜 ${data.zip}`);
+      }
+      box.textContent = parts.join("   ·   ");
+    } catch { /* offline/đổi trang — bỏ qua */ }
   }
 
   function selectedTargets() {
@@ -1391,6 +1473,10 @@
     if (e.target.checked) $("preview-video").play().catch(() => {});
     else $("preview-video").pause();
   });
+  // A2: gõ tên / bật bỏ dấu → cập nhật xem trước tên file.
+  $("opt-name").addEventListener("input", scheduleNamePreview);
+  $("opt-name-strip").addEventListener("change", scheduleNamePreview);
+  scheduleNamePreview(); // hiện gợi ý mặc định ngay lúc mở trang
 
   function currentSafeZone() {
     const t = selectedTargets().find((x) => x.preset && x.preset.width);
@@ -1498,6 +1584,9 @@
       xfade_duration: Number($("opt-xfade").value),
       xfade_transition: $("opt-transition").value,
       presets,
+      // A2: tên sản phẩm → tên file output (trống → backend giữ tên mặc định).
+      output_name: $("opt-name").value.trim() || null,
+      output_name_strip: $("opt-name-strip").checked,
       text: overlay.text,
       subtitle: overlay.subtitle,
       watermark: overlay.watermark,
@@ -2238,7 +2327,86 @@
   });
 
   // ======================================================= kho video (section cuối trang)
+  // A3: thanh dung lượng kho + giới hạn + nút dọn.
+  async function loadStorage() {
+    try {
+      const res = await fetch("/api/settings");
+      if (!res.ok) return;
+      const d = await res.json();
+      const maxGB = d.library_max_gb || 5;
+      const maxFiles = d.library_max_files || 200;
+      const usedGB = (d.library_used_bytes || 0) / 1e9;
+      const usedFiles = d.library_used_files || 0;
+      // Thanh theo % dung lượng; % số file hiển thị kèm trong text.
+      const pct = Math.min(100, (usedGB / maxGB) * 100);
+      const fill = $("lib-usage-fill");
+      fill.style.width = `${pct.toFixed(1)}%`;
+      // Màu cảnh báo: ≥80% cam (warn), 100%+ đỏ (danger).
+      fill.classList.toggle("warn", pct >= 80 && pct < 100);
+      fill.classList.toggle("danger", pct >= 100);
+      const filePct = (usedFiles / maxFiles) * 100;
+      $("lib-usage-text").textContent =
+        `Đã dùng ${usedGB.toFixed(2)} / ${maxGB} GB · ${usedFiles} / ${maxFiles} file`;
+      const warn = $("lib-usage-warn");
+      if (pct >= 100 || filePct >= 100) {
+        warn.hidden = false;
+        warn.textContent = "⚠ Kho đã đầy giới hạn — file cũ nhất sẽ bị tự xoá khi xuất tiếp. Nên dọn kho hoặc tăng giới hạn.";
+      } else if (pct >= 80 || filePct >= 80) {
+        warn.hidden = false;
+        warn.textContent = "⚠ Kho đã dùng ≥ 80% giới hạn — nên dọn kho sớm để không mất file cũ khi xuất tiếp.";
+      } else {
+        warn.hidden = true;
+      }
+      const input = $("lib-max-gb");
+      if (document.activeElement !== input) input.value = maxGB;
+    } catch { /* offline — giữ giá trị cũ */ }
+  }
+
+  $("lib-save-limit").addEventListener("click", async () => {
+    const gb = parseInt($("lib-max-gb").value, 10);
+    if (!(gb >= 1 && gb <= 500)) {
+      toast("Giới hạn dung lượng phải từ 1 đến 500 GB.", "err", 4000);
+      return;
+    }
+    try {
+      // Giữ nguyên giới hạn file hiện tại (đang có; UI chỉ chỉnh GB).
+      const cur = await (await fetch("/api/settings")).json();
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ library_max_gb: gb, library_max_files: cur.library_max_files || 200 }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || `Lỗi HTTP ${res.status}`);
+      toast(`Đã lưu giới hạn kho: ${gb} GB`, "ok");
+      loadStorage();
+      loadLibrary(); // giới hạn chặt hơn có thể đã dọn bớt file
+    } catch (err) {
+      toast(`Không lưu được giới hạn: ${err.message}`, "err", 4500);
+    }
+  });
+
+  $("lib-cleanup").addEventListener("click", async () => {
+    const cur = await (await fetch("/api/settings")).json().catch(() => null);
+    const gb = cur ? cur.library_max_gb : 5;
+    if (!confirm(`Dọn kho ngay bây giờ?\nCác file CŨ NHẤT sẽ bị xoá cho đến khi kho còn khoảng 70% giới hạn (${gb} GB). File của job đang chạy được giữ nguyên.`)) return;
+    try {
+      const res = await fetch("/api/library/cleanup", { method: "POST" });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || `Lỗi HTTP ${res.status}`);
+      const freed = (d.freed_bytes / 1e9).toFixed(2);
+      if (d.deleted > 0) toast(`Đã dọn ${d.deleted} file, giải phóng ${freed} GB`, "ok", 4500);
+      else toast("Kho đã gọn — không cần xoá file nào.", "info");
+      for (const w of d.warnings || []) toast(w, "info", 6000);
+      loadStorage();
+      loadLibrary();
+    } catch (err) {
+      toast(`Dọn kho thất bại: ${err.message}`, "err", 4500);
+    }
+  });
+
   async function loadLibrary() {
+    loadStorage(); // A3: cập nhật thanh dung lượng song song danh sách.
     const list = $("lib-list");
     list.innerHTML = `<div class="lib-empty">Đang tải kho…</div>`;
     try {
@@ -2261,7 +2429,7 @@
         const info = document.createElement("div");
         const name = document.createElement("div");
         name.className = "c-name";
-        name.textContent = it.file.split("__").pop() || it.file;
+        name.textContent = it.display_name || it.file.split("__").pop() || it.file;
         name.title = it.file;
         const meta = document.createElement("div");
         meta.className = "c-meta";

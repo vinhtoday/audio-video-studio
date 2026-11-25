@@ -1,7 +1,9 @@
 [package]
 name = "radio-video-merger"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
+# Cargo.lock định dạng v4 (version = 4) — cargo >= 1.78 mới đọc được.
+rust-version = "1.78"
 description = "Ghép audio radio vào video, tắt tiếng video gốc, tự lặp video nếu ngắn hơn audio"
 license = "MIT"
 
@@ -11,7 +13,6 @@ tokio = { version = "1", features = ["full"] }
 # Crate đi kèm chính thức của tokio: dùng ReaderStream để trả file mp4 dạng
 # stream (không load cả file vào RAM khi tải xuống).
 tokio-util = { version = "0.7", features = ["io"] }
-tower-http = { version = "0.6", features = ["cors"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 uuid = { version = "1", features = ["v4"] }
@@ -20,6 +21,10 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 open = "5"
 ffmpeg-sidecar = "2.7.0"
+# Chuẩn hoá Unicode NFC/NFD cho tên file tiếng Việt (naming.rs).
+unicode-normalization = "0.1"
+# Đọc dung lượng đĩa còn trống (statvfs / GetDiskFreeSpaceEx) đa nền tảng (storage.rs).
+fs4 = "0.13"
 fontdb = "0.24.0"
 
 [profile.release]

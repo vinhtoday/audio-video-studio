@@ -56,6 +56,8 @@ impl VerticalPlace {
 
 /// Chuyển động Ken Burns cho ảnh bìa.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+/// Dành cho bản ảnh bìa (Ken Burns + nền gradient) — chưa nối vào pipeline.
+#[allow(dead_code)]
 pub enum CoverMotion {
     #[default]
     Off,
@@ -100,15 +102,21 @@ pub struct VisualOptions {
     #[serde(default = "default_accent")]
     pub progress_color: String,
     /// "none" | "zoom_in" | "zoom_out" | "pan_left" | "pan_right" (ảnh bìa).
+    /// Dành cho bản ảnh bìa — UI chưa gửi, nhưng giữ field để JSON options
+    /// tương thích khi nối vào.
     #[serde(default)]
+    #[allow(dead_code)]
     pub cover_motion: String,
     /// "gradient" | "black" — nền sau video chưa đầy khung / khi không có
-    /// video lẫn ảnh bìa.
+    /// video lẫn ảnh bìa. Dành cho bản ảnh bìa.
     #[serde(default = "default_background")]
+    #[allow(dead_code)]
     pub background: String,
     #[serde(default = "default_grad_from")]
+    #[allow(dead_code)]
     pub gradient_from: String,
     #[serde(default = "default_grad_to")]
+    #[allow(dead_code)]
     pub gradient_to: String,
 }
 
@@ -163,16 +171,21 @@ impl VisualOptions {
         VerticalPlace::parse(&self.visualizer_position)
     }
 
+    /// Dành cho bản ảnh bìa (Ken Burns + nền gradient).
+    #[allow(dead_code)]
     pub fn motion(&self) -> CoverMotion {
         CoverMotion::parse(&self.cover_motion)
     }
 
     /// Nền sau video là gradient chuyển động (chế độ fit "pad").
+    /// Dành cho bản ảnh bìa.
+    #[allow(dead_code)]
     pub fn gradient_background(&self) -> bool {
         self.background.trim().eq_ignore_ascii_case("gradient")
     }
 
-    /// Màu nền `pad` khi không dùng gradient.
+    /// Màu nền `pad` khi không dùng gradient. Dành cho bản ảnh bìa.
+    #[allow(dead_code)]
     pub fn pad_color(&self) -> String {
         if self.gradient_background() {
             // Không có lavfi (ví dụ lệnh cắt/normalize đơn giản): dùng màu đầu
@@ -251,6 +264,8 @@ pub fn build_visualizer(v: &VisualOptions, frame: &FrameCtx) -> (Option<String>,
 
 /// Nguồn nền gradient chuyển động (lavfi) cho lệnh ffmpeg:
 /// `-f lavfi -i "<graph>"`.
+/// Dành cho bản ảnh bìa (Ken Burns + nền gradient) — chưa nối vào pipeline.
+#[allow(dead_code)]
 pub fn gradient_source(v: &VisualOptions, width: u32, height: u32, fps: u32) -> String {
     let c0 = drawtext_color(&v.gradient_from, 1.0);
     let c1 = drawtext_color(&v.gradient_to, 1.0);
@@ -259,6 +274,8 @@ pub fn gradient_source(v: &VisualOptions, width: u32, height: u32, fps: u32) -> 
 
 /// Bộ supersample cho Ken Burns: 2× với khung ≤ 2.5MP, 1.5× tới 5MP, ngoài ra
 /// 1× (khung 4K đã quá lớn, zoompan 8K sẽ rất chậm).
+/// Dành cho bản ảnh bìa (Ken Burns + nền gradient) — chưa nối vào pipeline.
+#[allow(dead_code)]
 fn supersample(width: u32, height: u32) -> f64 {
     let mp = width as f64 * height as f64 / 1_000_000.0;
     if mp <= 2.5 {
@@ -273,6 +290,8 @@ fn supersample(width: u32, height: u32) -> f64 {
 /// Filter đưa ẢNH BÌA vào khung đích (đưa vào `-vf`, ảnh là input
 /// `-loop 1 -framerate fps`). Có hiệu ứng thì supersample rồi `zoompan` trong
 /// `duration` giây; không thì scale/crop thẳng.
+/// Dành cho bản ảnh bìa (Ken Burns + nền gradient) — chưa nối vào pipeline.
+#[allow(dead_code)]
 pub fn cover_fit_filters(v: &VisualOptions, frame: &FrameCtx, duration: f64) -> Vec<String> {
     let motion = v.motion();
     let (w, h) = (frame.width, frame.height);
