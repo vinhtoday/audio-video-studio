@@ -225,7 +225,11 @@ pub fn build_visualizer(v: &VisualOptions, frame: &FrameCtx) -> (Option<String>,
     let mono = "[1:a]aformat=channel_layouts=mono,";
     let graph = match kind {
         VisualizerKind::Wave => {
-            format!("{mono}showwaves=s={w}x{h}:mode=cline:rate={fps}:colors={color}@{alpha:.3}[viz]")
+            // showwaves vẽ nét dày đúng 1 px — trên khung 1080 gần như vô
+            // hình và mất sắc độ khi nén yuv420p. Vẽ ở 1/5 độ phân giải rồi
+            // phóng bicubic để có dải sáng dày, mềm (kiểu neon).
+            let (sw, sh) = ((w / 5).max(2), (h / 5).max(2));
+            format!("{mono}showwaves=s={sw}x{sh}:mode=cline:rate={fps}:colors={color},scale={w}x{h}:flags=bicubic,format=rgba,colorchannelmixer=aa={alpha:.3}[viz]")
         }
         VisualizerKind::Bars => format!(
             "{mono}showfreqs=s={w}x{h}:mode=bar:win_size=2048:ascale=log:fscale=log:rate={fps}:cmode=combined:colors={color},format=rgba,colorchannelmixer=aa={alpha:.3}[viz]"
@@ -358,7 +362,7 @@ mod tests {
         let (g, o) = build_visualizer(&v, &tiktok());
         assert_eq!(
             g,
-            Some("[1:a]aformat=channel_layouts=mono,showwaves=s=1080x346:mode=cline:rate=30:colors=0x39FF14@0.900[viz]".into())
+            Some("[1:a]aformat=channel_layouts=mono,showwaves=s=216x69:mode=cline:rate=30:colors=0x39FF14,scale=1080x346:flags=bicubic,format=rgba,colorchannelmixer=aa=0.900[viz]".into())
         );
         // Đáy: né safe-zone 440 + khoảng hở 40.
         assert_eq!(o, Some("overlay=x=0:y='H-overlay_h-480':eof_action=repeat".into()));
