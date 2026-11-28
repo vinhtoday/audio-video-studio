@@ -6,7 +6,6 @@
 //! CRC32 chuẩn (polynomial 0xEDB88320).
 
 use std::io;
-use std::path::Path;
 
 // ---------------------------------------------------------------------------
 // CRC32
@@ -60,14 +59,9 @@ impl<W: io::Write> ZipWriter<W> {
         Self { out, entries: Vec::new() }
     }
 
-    /// Thêm 1 file: đọc toàn bộ bytes từ `path`, tên trong zip là `name`.
-    /// Mp4 output luôn < 4GB nên u32 size là đủ (zip32).
-    pub fn add_file(&mut self, name: &str, path: &Path) -> io::Result<()> {
-        let data = std::fs::read(path)?;
-        self.add_bytes(name, &data)
-    }
-
-    /// Thôi viên dữ liệu có sẵn trong RAM.
+    /// Thêm 1 file từ dữ liệu có sẵn (caller tự đọc — xem
+    /// `jobs::read_with_fallback`). Mp4 output luôn < 4GB nên u32 size là đủ
+    /// (zip32).
     pub fn add_bytes(&mut self, name: &str, data: &[u8]) -> io::Result<()> {
         if data.len() > u32::MAX as usize {
             return Err(io::Error::new(

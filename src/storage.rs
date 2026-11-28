@@ -14,10 +14,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-/// Đường dẫn thư mục kho output (đồng bộ với jobs::LIBRARY_DIR — khai báo ở jobs
-/// vì storage chỉ tham chiếu).
-const SETTINGS_FILE: &str = "settings.json";
-
+/// Thư mục kho output: dùng jobs::library_dir() (M8: theo thư mục dữ liệu).
 /// Giới hạn mặc định của kho (đề mục A3).
 pub const DEFAULT_MAX_GB: u64 = 5;
 pub const DEFAULT_MAX_FILES: usize = 200;
@@ -77,7 +74,7 @@ impl SettingsStore {
 
     /// Bản có đường dẫn để unit test dùng thư mục tạm.
     fn load_from_disk() -> LibrarySettings {
-        let mut s = Self::read_file(Path::new(SETTINGS_FILE)).unwrap_or_default();
+        let mut s = Self::read_file(&crate::datadir::settings_path()).unwrap_or_default();
         // Env override: chỉ áp khi hợp lệ, sai khoảng thì bỏ qua + log.
         if let Ok(v) = std::env::var("RVM_LIBRARY_MAX_GB") {
             match v.parse::<u64>() {
@@ -128,7 +125,7 @@ impl SettingsStore {
         });
         let text = serde_json::to_string_pretty(&json)
             .map_err(|e| format!("Không tạo JSON settings: {e}"))?;
-        std::fs::write(SETTINGS_FILE, text + "\n")
+        std::fs::write(crate::datadir::settings_path(), text + "\n")
             .map_err(|e| format!("Không ghi được settings.json: {e}"))?;
         *self.inner.write().await = s;
         Ok(())
@@ -190,7 +187,7 @@ pub fn plan_cleanup(
         .filter(|f| !protected_jobs.contains(&f.job_id))
         .collect();
     // Cũ nhất trước: mtime nhỏ nhất được xoá đầu tiên.
-    deletable.sort_by(|a, b| a.modified_ms.cmp(&b.modified_ms));
+    deletable.sort_by_key(|a| a.modified_ms);
 
     let total_bytes: u64 = files.iter().map(|f| f.size).sum();
     let total_files = files.len();
@@ -339,7 +336,7 @@ pub async fn enforce_library_limits(
     let max_bytes = settings.max_gb * 1_000_000_000;
     let max_files = settings.max_files;
     let result = tokio::task::spawn_blocking(move || {
-        let files = scan_library_sync(Path::new(crate::jobs::LIBRARY_DIR));
+        let files = scan_library_sync(&crate::jobs::library_dir());
         let plan = plan_cleanup(&files, max_bytes, max_files, &protected_jobs);
         execute_plan_sync(&plan)
     })
@@ -367,7 +364,7 @@ pub async fn cleanup_library_to_ratio(
     let max_bytes = settings.max_gb * 1_000_000_000;
     let max_files = settings.max_files;
     tokio::task::spawn_blocking(move || {
-        let files = scan_library_sync(Path::new(crate::jobs::LIBRARY_DIR));
+        let files = scan_library_sync(&crate::jobs::library_dir());
         let plan = plan_cleanup_to_ratio(&files, max_bytes, max_files, ratio, &protected_jobs);
         execute_plan_sync(&plan)
     })
@@ -387,7 +384,7 @@ pub struct LibraryUsage {
 
 pub async fn library_usage() -> LibraryUsage {
     tokio::task::spawn_blocking(|| {
-        let files = scan_library_sync(Path::new(crate::jobs::LIBRARY_DIR));
+        let files = scan_library_sync(&crate::jobs::library_dir());
         LibraryUsage {
             total_bytes: files.iter().map(|f| f.size).sum(),
             total_files: files.len(),
@@ -517,7 +514,7 @@ mod tests {
         // 1 file 8 GB, limit 5 GB → không file nào khác để xoá → giữ + cảnh báo.
         let files = vec![
             f("j1", "lon.mp4", 8 * GB, 100),
-            f("j2", "nho.mp4", 1 * GB, 50), // cũ hơn, xoá được
+            f("j2", "nho.mp4", GB, 50), // cũ hơn, xoá được
         ];
         let plan = plan_cleanup(&files, 5 * GB, 200, &[]);
         // Xoá file nhỏ cũ nhất trước, nhưng vẫn còn 8 GB > 5 GB → cảnh báo.
@@ -629,7 +626,7 @@ mod tests {
         let res = execute_plan_sync(&plan);
         // 2 file cũ (3000 byte) bị xoá, còn file mới 1500 ≤ 2000.
         assert_eq!(res.deleted, 2);
-        assert!(dir.join("j_old").exists() == false); // thư mục rỗng bị dọn
+        assert!(!dir.join("j_old").exists()); // thư mục rỗng bị dọn
         assert!(dir.join("j_new/c.bin").exists());
         // Sau dọn: chỉ còn 1 file.
         assert_eq!(scan_library_sync(&dir).len(), 1);

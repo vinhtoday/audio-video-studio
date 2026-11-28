@@ -178,6 +178,7 @@ impl FontMetrics {
 }
 
 #[cfg(test)]
+#[allow(clippy::approx_constant)] // 0.318 = số đo font tổng hợp trong test, không phải hằng số toán
 mod tests {
     use super::*;
 

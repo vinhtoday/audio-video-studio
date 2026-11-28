@@ -223,7 +223,7 @@ pub fn parse_srt(content: &str) -> Result<Vec<Cue>, String> {
         };
         let (a, b) = line.split_at(arrow);
         // Sau mốc kết thúc có thể có toạ độ "X1:.. X2:.." → chỉ lấy token đầu.
-        let end_tok = b[3..].trim().split_whitespace().next().unwrap_or("");
+        let end_tok = b[3..].split_whitespace().next().unwrap_or("");
         let (Some(start), Some(end)) = (parse_stamp(a), parse_stamp(end_tok)) else {
             i += 1;
             continue;

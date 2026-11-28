@@ -1389,6 +1389,7 @@ pub fn subtitle_style(
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
+#[allow(clippy::approx_constant)] // 0.318 = số đo font tổng hợp trong test, không phải hằng số toán
 mod tests {
     use super::*;
 
@@ -1707,7 +1708,7 @@ mod tests {
 
         // Đoạn dài: mỗi dòng sau khi ngắt phải vừa bề rộng khả dụng.
         let long = "và đây là một câu rất dài để buộc phải tự xuống dòng khi vượt quá bề rộng của khung video ";
-        let items = text_items(&text_opts(&format!("{long}{long}{long}").trim()), &font, &frame_720p());
+        let items = text_items(&text_opts(format!("{long}{long}{long}").trim()), &font, &frame_720p());
         let lines: Vec<&str> = items[0].content.lines().collect();
         assert!(lines.len() >= 2, "{lines:?}");
         let usable = 1280.0 - 1280.0 * 0.08;

@@ -313,6 +313,23 @@ async fn create_job(
             }
         }
 
+        // B2: tuỳ chọn chia phần — chế độ chỉ nhận "cut"/"split"; điểm cắt
+        // tay là số giây dương hữu hạn (≤ 200 điểm/preset). Điểm nằm ngoài
+        // audio hoặc tạo phần vượt giới hạn được run_job xử lý (về chia tự
+        // động + báo trong job.error), không từ chối job.
+        if !matches!(options.split.mode.as_str(), "cut" | "split") {
+            return Err(AppError::bad_request(
+                "Chế độ khi audio vượt giới hạn chỉ nhận \"cut\" hoặc \"split\".",
+            ));
+        }
+        for (pid, cuts) in &options.split.cuts {
+            if cuts.len() > 200 || cuts.iter().any(|c| !c.is_finite() || *c <= 0.0) {
+                return Err(AppError::bad_request(format!(
+                    "Điểm cắt tay của preset \"{pid}\" không hợp lệ (phải là số giây dương)."
+                )));
+            }
+        }
+
         // A3: kiểm tra đĩa trước khi render — cần ước tính tổng input × 3
         // (chuẩn hoá + ghép + output). Thiếu chỗ → từ chối ngay, báo số GB
         // còn/cần để người dùng tự dọn hoặc chọn preset gọn hơn.
@@ -372,14 +389,9 @@ async fn create_job(
                     target.preset_id
                 )));
             }
-            children.push(ChildJob {
-                preset_id: target.preset_id,
-                label: target.label,
-                status: JobStatus::Queued,
-                progress: 0.0,
-                error: None,
-                filename: None,
-            });
+            // B2: khoá = preset_id; run_job sẽ mở rộng thành các phần
+            // (khoá `<preset>.phan<N>`) nếu audio vượt giới hạn và chọn chia.
+            children.push(ChildJob::for_preset(&target));
         }
         let mut options = options;
         if let Some(a) = options.audio.as_mut() {
@@ -420,6 +432,7 @@ async fn create_job(
         children,
         cancel: None,
         output_stem,
+        finalizing: true,
     };
     state.store.insert(job).await;
 
@@ -604,14 +617,15 @@ async fn download_job(
     // Workspace truoc, library sau (job cu da don workspace).
     let mut path = job_dir_abs(&uuid).join(&filename);
     if !tokio::fs::try_exists(&path).await.unwrap_or(false) {
-        path = std::path::PathBuf::from("library")
+        path = crate::jobs::library_dir()
             .join(uuid.to_string())
             .join(format!("{}__{filename}", child.preset_id));
     }
     serve_file(&path, &filename, mime_for(&path)).await
 }
 
-/// GET /api/jobs/:id/download/:preset — file mp4 của 1 preset cụ thể.
+/// GET /api/jobs/:id/download/:key — file mp4 của 1 job con (`key` = preset_id,
+/// hoặc `<preset>.phan<N>` khi preset được chia phần — B2).
 async fn download_child(
     State(state): State<AppState>,
     Path((id, preset)): Path<(String, String)>,
@@ -677,7 +691,7 @@ async fn serve_file(path: &std::path::Path, filename: &str, mime: &str) -> AppRe
 // Stream inline (player trong app) — hỗ trợ HTTP Range để seek được.
 // ---------------------------------------------------------------------------
 
-/// GET /api/jobs/:id/stream/:preset — stream output của 1 preset (inline).
+/// GET /api/jobs/:id/stream/:key (key = preset_id hoặc `<preset>.phan<N>` khi chia phần — B2) — stream output của 1 preset (inline).
 async fn stream_child(
     State(state): State<AppState>,
     Path((id, preset)): Path<(String, String)>,
@@ -807,7 +821,7 @@ fn parse_range(h: &str, total: u64) -> Option<(u64, u64)> {
 /// GET /api/library — liệt kê mọi output đã lưu trong kho (mới nhất trước).
 async fn list_library(State(_state): State<AppState>) -> AppResult<Json<serde_json::Value>> {
     let mut items: Vec<serde_json::Value> = Vec::new();
-    let lib = std::path::PathBuf::from("library");
+    let lib = crate::jobs::library_dir();
     // Đọc thư mục KHÔNG chặn runtime (tokio::fs, chạy trên blocking pool).
     let mut job_dirs: Vec<_> = match tokio::fs::read_dir(&lib).await {
         Ok(mut rd) => {
@@ -907,7 +921,7 @@ async fn serve_library(
         .unwrap_or_default();
     let file_name = crate::naming::safe_lookup_name(&file_param)
         .ok_or_else(|| AppError::bad_request("Tên file không hợp lệ."))?;
-    let path = std::path::PathBuf::from("library")
+    let path = crate::jobs::library_dir()
         .join(&job)
         .join(&file_name);
     if !path.exists() {
@@ -941,7 +955,7 @@ async fn library_delete(
     // A2: như serve_library — chặn traversal, giữ Unicode.
     let file_name = crate::naming::safe_lookup_name(&file_param)
         .ok_or_else(|| AppError::bad_request("Tên file không hợp lệ."))?;
-    let path = std::path::PathBuf::from("library").join(&job).join(&file_name);
+    let path = crate::jobs::library_dir().join(&job).join(&file_name);
     if !path.exists() {
         return Err(AppError::not_found("File không còn trong kho."));
     }

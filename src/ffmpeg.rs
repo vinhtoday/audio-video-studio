@@ -22,6 +22,11 @@ use tokio::process::Command;
 
 use crate::jobs::AudioOptions;
 
+/// B2: fade-in ở đầu mỗi phần chia (trừ phần đầu) — không bị "bụp".
+const CUT_FADE_IN: f64 = crate::split::CUT_FADE_IN_SEC;
+/// B2: fade-out ở điểm cắt (phần không cuối) — không bị "bụp".
+const CUT_FADE_OUT: f64 = crate::split::CUT_FADE_OUT_SEC;
+
 // ---------------------------------------------------------------------------
 // Định vị binary ffmpeg/ffprobe — dùng crate open-source `ffmpeg-sidecar`
 // (https://github.com/nathanbabcock/ffmpeg-sidecar).
@@ -596,6 +601,16 @@ pub fn encode_profile(quality: &str) -> EncodeProfile {
     EncodeProfile { preset, crf: crf.into(), audio_rate: audio_rate.into() }
 }
 
+/// Độ dài thật của file ra: min(audio, giới hạn nền tảng). Giới hạn `0` nghĩa là
+/// KHÔNG giới hạn (như `None`) — đây là quy ước của presets_config.json. Một hàm
+/// duy nhất cho mọi pass cuối (video/MP3/chia phần) để không lệch nhau.
+pub fn out_duration(audio_duration: f64, max_duration_sec: Option<u64>) -> f64 {
+    match max_duration_sec {
+        Some(max) if max > 0 && (max as f64) < audio_duration => max as f64,
+        _ => audio_duration,
+    }
+}
+
 /// Args pass cuối (giai đoạn 3 mở rộng):
 /// - `-stream_loop -1` trước `-i chain`: chuỗi lặp vô hạn.
 /// - Chỉ map video chuỗi + `1:a:0` (audio radio là âm thanh duy nhất).
@@ -613,6 +628,62 @@ pub fn build_final_args(
     overlay: &crate::textover::OverlaySpec,
     logo: Option<&Path>,
 ) -> Vec<String> {
+    build_final_args_with_segment(
+        chain,
+        audio,
+        output,
+        audio_duration,
+        max_duration_sec,
+        options,
+        overlay,
+        logo,
+        None,
+    )
+}
+
+/// B2 — đoạn audio của một phần khi chia phần (giây, trên audio gốc).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AudioSegment {
+    /// Điểm bắt đầu trên audio gốc.
+    pub start: f64,
+    /// Độ dài phần.
+    pub len: f64,
+    /// Phần không đầu tiên: fade-in 0.15s để không bị "bụp".
+    pub fade_in: bool,
+    /// Phần không cuối: fade-out 0.3s ở điểm cắt để không bị "bụp".
+    pub fade_out: bool,
+}
+
+impl AudioSegment {
+    pub fn new(start: f64, end: f64, is_first: bool, is_last: bool) -> Self {
+        Self {
+            start,
+            len: (end - start).max(0.0),
+            fade_in: !is_first,
+            fade_out: !is_last,
+        }
+    }
+}
+
+/// Bản đầy đủ của [`build_final_args`]: `segment = Some` khi render một phần
+/// của audio dài hơn giới hạn preset.
+/// - `-ss <start>` trước `-i audio`: lấy đúng đoạn (ffmpeg seek chính xác khi
+///   transcode), `-t` = độ dài phần (tức `-to` tương đối của phần).
+/// - Video vẫn `-stream_loop -1` từ đầu chuỗi: mỗi phần lặp video từ đầu.
+/// - Fade-in 0.15s ở đầu phần (trừ phần đầu), fade-out 0.3s ở điểm cắt (trừ
+///   phần cuối — phần cuối giữ fade-out cuối bài như thường).
+#[allow(clippy::too_many_arguments)]
+pub fn build_final_args_with_segment(
+    chain: &Path,
+    audio: &Path,
+    output: &Path,
+    audio_duration: f64,
+    max_duration_sec: Option<u64>,
+    options: &AudioOptions,
+    overlay: &crate::textover::OverlaySpec,
+    logo: Option<&Path>,
+    segment: Option<AudioSegment>,
+) -> Vec<String> {
     let mut args: Vec<String> = Vec::new();
 
     args.push("-hide_banner".into());
@@ -624,6 +695,11 @@ pub fn build_final_args(
     args.push("-i".into());
     args.push(chain.to_string_lossy().into_owned());
 
+    // B2: đọc audio từ đúng điểm bắt đầu của phần.
+    if let Some(seg) = segment {
+        args.push("-ss".into());
+        args.push(format!("{:.3}", seg.start.max(0.0)));
+    }
     args.push("-i".into());
     args.push(audio.to_string_lossy().into_owned());
 
@@ -672,16 +748,25 @@ pub fn build_final_args(
     args.push("aac".into());
     args.push("-b:a".into());
     args.push(encode_profile(&options.quality).audio_rate);
+    // M8: audio nguồn mono (podcast/ghi âm điện thoại) → output vẫn stereo
+    // chuẩn cho mọi nền tảng (aac mono bị vài player phát lệch kênh).
+    args.push("-ac".into());
+    args.push("2".into());
 
-    // Thời lượng output: min(audio, giới hạn nền tảng) — phải tính TRƯỚC khi
-    // dựng `-af`. (Bản 0.3 tính sau rồi tìm lại chuỗi "afade=…" trong args nên
-    // không bao giờ khớp khi có `volume=` đứng trước: fade-out rơi ra sau điểm
-    // cắt và người xem không nghe thấy.)
-    let out_duration = match max_duration_sec {
-        Some(max) if (max as f64) < audio_duration => max as f64,
-        _ => audio_duration,
+    // Thời lượng output: phần chia (B2) hoặc min(audio, giới hạn nền tảng) —
+    // phải tính TRƯỚC khi dựng `-af`. (Bản 0.3 tính sau rồi tìm lại chuỗi
+    // "afade=…" trong args nên không bao giờ khớp khi có `volume=` đứng trước:
+    // fade-out rơi ra sau điểm cắt và người xem không nghe thấy.)
+    let out_duration = match segment {
+        Some(seg) => seg.len,
+        None => out_duration(audio_duration, max_duration_sec),
     };
     let mut filters: Vec<String> = Vec::new();
+    if let Some(seg) = segment {
+        if seg.fade_in {
+            filters.push(format!("afade=t=in:st=0:d={:.3}", CUT_FADE_IN.min(out_duration)));
+        }
+    }
     if options.volume != 100.0 {
         let factor = options.volume / 100.0;
         filters.push(format!("volume={factor:.4}"));
@@ -692,6 +777,13 @@ pub fn build_final_args(
         let fade = options.fade_out.min(out_duration).max(0.0);
         let start = (out_duration - fade).max(0.0);
         filters.push(format!("afade=t=out:st={start:.3}:d={fade:.3}"));
+    }
+    // B2: fade-out ngắn ở điểm cắt (phần không cuối) để không bị "bụp".
+    if let Some(seg) = segment {
+        if seg.fade_out {
+            let fade = CUT_FADE_OUT.min(out_duration);
+            filters.push(format!("afade=t=out:st={:.3}:d={fade:.3}", (out_duration - fade).max(0.0)));
+        }
     }
     if !filters.is_empty() {
         args.push("-af".into());
@@ -732,10 +824,7 @@ pub fn build_mp3_args(
     args.push("-map".into());
     args.push("0:a:0".into());
 
-    let out_duration = match max_duration_sec {
-        Some(max) if (max as f64) < audio_duration => max as f64,
-        _ => audio_duration,
-    };
+    let out_duration = out_duration(audio_duration, max_duration_sec);
     let mut filters: Vec<String> = Vec::new();
     if options.volume != 100.0 {
         let factor = options.volume / 100.0;
@@ -899,6 +988,16 @@ fn parse_timecode(s: &str) -> Option<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Hồi quy: preset `max_duration_sec = 0` (fb_feed_4x5, threads_4x5 trong
+    // presets_config.json = không giới hạn) từng bị render thành clip 0 giây.
+    #[test]
+    fn out_duration_0_la_khong_gioi_han() {
+        assert_eq!(out_duration(500.0, Some(0)), 500.0, "0 = không giới hạn");
+        assert_eq!(out_duration(30.0, Some(180)), 30.0, "dưới giới hạn: giữ nguyên audio");
+        assert_eq!(out_duration(500.0, Some(180)), 180.0, "cắt còn đúng giới hạn");
+        assert_eq!(out_duration(500.0, None), 500.0);
+    }
 
     // ==== build_filter_complex: preset × chế độ khớp khung =================
 
@@ -1397,6 +1496,14 @@ mod tests {
     }
 
     #[test]
+    fn final_args_always_output_stereo() {
+        // M8: audio nguồn mono → output vẫn stereo (-ac 2).
+        let args = final_args_for(&aopts(100.0, 0.0, false));
+        let s = args.join(" ");
+        assert!(s.contains("-ac 2"), "phải có -ac 2 cho output stereo: {s}");
+    }
+
+    #[test]
     fn final_fade_never_negative_start() {
         let args = build_final_args(
             Path::new("/tmp/chain.mp4"),
@@ -1411,6 +1518,68 @@ mod tests {
         let af = args.iter().position(|a| a == "-af").unwrap();
         // Audio 2s + fade 5s: fade co bằng đúng độ dài file để về im lặng.
         assert!(args[af + 1].contains("afade=t=out:st=0.000:d=2.000"), "{}", args[af + 1]);
+    }
+
+    fn seg_args(seg: Option<AudioSegment>, fade_out: f64) -> Vec<String> {
+        build_final_args_with_segment(
+            Path::new("/tmp/chain.mp4"),
+            Path::new("/tmp/a.mp3"),
+            Path::new("/tmp/out.mp4"),
+            25.0,
+            Some(10),
+            &aopts(100.0, fade_out, false),
+            &crate::textover::OverlaySpec::default(),
+            None,
+            seg,
+        )
+    }
+
+    fn val<'a>(args: &'a [String], flag: &str) -> &'a str {
+        let i = args.iter().position(|a| a == flag).unwrap_or_else(|| panic!("thiếu {flag}: {args:?}"));
+        &args[i + 1]
+    }
+
+    // B2: phần đầu (0–8.333 của audio 25s): -ss 0, -t = độ dài phần, chỉ có
+    // fade-out ở điểm cắt (không fade-in), video vẫn lặp từ đầu chuỗi.
+    #[test]
+    fn segment_first_part_has_cut_fade_out_only() {
+        let args = seg_args(Some(AudioSegment::new(0.0, 8.333, true, false)), 0.0);
+        assert_eq!(val(&args, "-ss"), "0.000");
+        assert_eq!(val(&args, "-t"), "8.333000");
+        assert_eq!(val(&args, "-af"), "afade=t=out:st=8.033:d=0.300");
+        assert!(args.join(" ").contains("-stream_loop -1 -i /tmp/chain.mp4"));
+    }
+
+    // B2: phần giữa có cả fade-in 0.15s (đầu phần) và fade-out 0.3s (điểm cắt).
+    #[test]
+    fn segment_middle_part_has_fade_in_and_out() {
+        let args = seg_args(Some(AudioSegment::new(8.333, 16.667, false, false)), 0.0);
+        assert_eq!(val(&args, "-ss"), "8.333");
+        assert_eq!(val(&args, "-t"), "8.334000");
+        assert_eq!(val(&args, "-af"), "afade=t=in:st=0:d=0.150,afade=t=out:st=8.034:d=0.300");
+    }
+
+    // B2: phần cuối có fade-in, không fade-out điểm cắt; fade-out cuối bài
+    // của người dùng vẫn áp dụng như thường.
+    #[test]
+    fn segment_last_part_keeps_user_fade_out() {
+        let args = seg_args(Some(AudioSegment::new(16.667, 25.0, false, true)), 1.0);
+        assert_eq!(val(&args, "-ss"), "16.667");
+        assert_eq!(val(&args, "-af"), "afade=t=in:st=0:d=0.150,afade=t=out:st=7.333:d=1.000");
+    }
+
+    // B2: -ss đứng TRƯỚC -i audio (input option của đúng input audio).
+    #[test]
+    fn segment_ss_precedes_audio_input() {
+        let args = seg_args(Some(AudioSegment::new(5.0, 12.0, false, false)), 0.0);
+        let s: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+        let chain_i = s.iter().position(|a| *a == "/tmp/chain.mp4").unwrap();
+        let ss = s.iter().position(|a| *a == "-ss").unwrap();
+        let audio_i = s.iter().position(|a| *a == "/tmp/a.mp3").unwrap();
+        assert!(chain_i < ss && ss < audio_i, "{s:?}");
+        // -ss nằm ngay trước "-i <audio>": [-ss, "<start>", -i, <audio>]
+        assert_eq!(s[ss + 2], "-i");
+        assert_eq!(s[ss + 3], "/tmp/a.mp3");
     }
 
     /// HỒI QUY bản 0.3: có `volume=` thì fade-out KHÔNG được tính lại theo
@@ -1452,7 +1621,7 @@ mod tests {
         };
         let balanced = s("balanced");
         assert!(balanced.contains("-preset veryfast -crf 23 -pix_fmt yuv420p"), "{balanced}");
-        assert!(balanced.ends_with("-b:a 192k -t 60.000000 -movflags +faststart -y /o.mp4"), "{balanced}");
+        assert!(balanced.ends_with("-b:a 192k -ac 2 -t 60.000000 -movflags +faststart -y /o.mp4"), "{balanced}");
         assert!(s("high").contains("-preset slow -crf 18"));
         assert!(s("FAST").contains("-crf 26"));
         assert!(s("").contains("-preset veryfast -crf 23"), "giá trị rỗng → mặc định");

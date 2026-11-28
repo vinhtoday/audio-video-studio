@@ -161,6 +161,19 @@ pub fn zip_filename(stem: &str) -> String {
     format!("{stem}.zip")
 }
 
+/// B2: chèn `_phan<n>` trước đuôi file — `Ten.mp4` → `Ten_phan1.mp4`,
+/// `Ten_tiktok_9x16.mp4` → `Ten_tiktok_9x16_phan1.mp4`. Không có đuôi thì
+/// nối cuối tên.
+pub fn part_filename(name: &str, index: usize) -> String {
+    let suffix = format!("_phan{index}");
+    match name.rfind('.') {
+        // Dấu chấm chỉ tính là đuôi khi không phải ký tự đầu và nằm ở cùng
+        // "đoạn tên" (sau dấu / cuối cùng) — "a.b/c" không có đuôi.
+        Some(i) if i > 0 && !name[i..].contains('/') => format!("{}{suffix}{}", &name[..i], &name[i..]),
+        _ => format!("{name}{suffix}"),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Trùng tên trong kho
 // ---------------------------------------------------------------------------
@@ -395,6 +408,19 @@ mod tests {
         // Ký tự cấm trong header value (dấu nháy) được thay bằng '_'.
         let cd = content_disposition(true, "a\"b.mp4");
         assert!(cd.contains("filename=\"a_b.mp4\""), "{cd}");
+    }
+
+    // ---- chia phần (B2) -------------------------------------------------------
+
+    #[test]
+    fn part_filename_chen_truoc_duoi() {
+        assert_eq!(part_filename("Ten.mp4", 1), "Ten_phan1.mp4");
+        assert_eq!(part_filename("Ten_tiktok_9x16.mp4", 12), "Ten_tiktok_9x16_phan12.mp4");
+        assert_eq!(part_filename("radio_tiktok_9x16_1080x1920.mp4", 2), "radio_tiktok_9x16_1080x1920_phan2.mp4");
+        assert_eq!(part_filename("Kem chống nắng.mp4", 3), "Kem chống nắng_phan3.mp4");
+        assert_eq!(part_filename("khongduoi", 1), "khongduoi_phan1");
+        // Tên có chấm ở thư mục: không coi là đuôi.
+        assert_eq!(part_filename("a.b/c", 1), "a.b/c_phan1");
     }
 
     // ---- tra cứu an toàn ------------------------------------------------------

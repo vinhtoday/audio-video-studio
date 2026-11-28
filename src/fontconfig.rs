@@ -60,12 +60,13 @@ fn font_dirs() -> Vec<PathBuf> {
 }
 
 /// Đường dẫn file `fonts.conf` app quản lý (tạo trong workspace/fonts).
-/// Workspace gốc lấy từ `RVM_WORKSPACE` hoặc `./workspace` — trùng logic jobs.
+/// Workspace gốc theo M8: RVM_WORKSPACE (cũ, giữ tương thích) hoặc thư mục
+/// dữ liệu chuẩn (RVM_DATA_DIR / cạnh exe).
 fn fonts_conf_path() -> PathBuf {
-    let ws = std::env::var_os("RVM_WORKSPACE")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("workspace"));
-    ws.join("fonts.conf")
+    match std::env::var_os("RVM_WORKSPACE") {
+        Some(ws) => PathBuf::from(ws).join("fonts.conf"),
+        None => crate::jobs::workspace_dir().join("fonts.conf"),
+    }
 }
 
 /// Tạo (nếu chưa có) file fonts.conf trỏ vào thư mục font hệ thống và trả về
@@ -94,7 +95,7 @@ pub fn ensure_fonts_conf() -> std::io::Result<PathBuf> {
     // directories" và tra cứu font chậm lại mỗi lần spawn ffmpeg.
     let cache = conf
         .parent()
-        .unwrap_or(Path::new("workspace"))
+        .unwrap_or_else(|| Path::new("workspace"))
         .join("fontconfig-cache")
         .to_string_lossy()
         .replace('\\', "/");

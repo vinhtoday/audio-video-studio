@@ -93,6 +93,19 @@
   }
   input:focus, textarea:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); outline: none; }
   select { cursor: pointer; }
+  /* M6 a11y: vùng bấm tối thiểu — desktop 32px, cảm ứng (coarse) 44px
+     (khuyến nghị WCAG 2.5.5 / Apple HIG). Áp cho nút, select, checkbox,
+     radio, ô màu, ô hex. */
+  button, select, input[type="checkbox"], input[type="radio"], input[type="color"],
+  input[type="text"], input[type="number"] { min-height: 32px; }
+  input[type="checkbox"], input[type="radio"] { width: 16px; height: 16px; min-height: 0; }
+  input[type="color"] { min-width: 32px; }
+  @media (pointer: coarse) {
+    button, select, input[type="color"], input[type="text"], input[type="number"] { min-height: 44px; }
+    input[type="checkbox"], input[type="radio"] { width: 22px; height: 22px; min-height: 0; }
+    input[type="range"] { min-height: 44px; }
+    .preset-chip { min-height: 44px; }
+  }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
 
   /* ==================== H1: Hero onboarding ==================== */
@@ -310,6 +323,45 @@
   .dur-warnings .warn-row { font-size: .78rem; color: var(--warn); background: var(--warn-dim);
     border: 1px solid rgba(251,191,36,.22); border-radius: var(--r-sm); padding: 7px 11px; }
 
+  /* ==================== B2: chia phần ==================== */
+  .split-opts { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
+  .split-note { margin-top: 0; }
+  #split-label-opts { display: flex; flex-direction: column; gap: 10px; padding: 10px 12px; border: 1px dashed var(--line-strong); border-radius: var(--r-sm); }
+  #split-label-opts[hidden] { display: none; }
+  .label-detail { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px 14px; }
+  .label-detail[hidden] { display: none; }
+  .split-plan { margin-top: 6px; padding: 9px 11px 12px; border: 1px solid rgba(99,102,241,.3); border-radius: var(--r-sm);
+    background: rgba(99,102,241,.07); }
+  .split-plan .sp-head { display: flex; justify-content: space-between; align-items: center; gap: 8px 12px; flex-wrap: wrap;
+    font-size: .78rem; color: var(--text); }
+  .split-plan .sp-head b { color: var(--accent-2); }
+  .split-plan .sp-reset { font: inherit; font-size: .72rem; font-weight: 600; padding: 3px 10px; border-radius: 8px;
+    border: 1px solid var(--line-strong); background: var(--panel-2); color: var(--dim); cursor: pointer; }
+  .split-plan .sp-reset:hover { border-color: var(--accent-2); color: var(--text); }
+  .split-plan .sp-reset[hidden] { display: none; }
+  .sp-timeline { position: relative; display: flex; height: 40px; margin-top: 12px; }
+  .sp-part { display: flex; align-items: center; justify-content: center; min-width: 0; overflow: hidden; box-sizing: border-box;
+    font-size: .7rem; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); white-space: nowrap;
+    background: linear-gradient(180deg, rgba(99,102,241,.46), rgba(99,102,241,.24));
+    border-top: 1px solid rgba(99,102,241,.55); border-bottom: 1px solid rgba(99,102,241,.55); user-select: none; }
+  .sp-part:first-child { border-left: 1px solid rgba(99,102,241,.55); border-radius: 7px 0 0 7px; }
+  .sp-part:last-child { border-right: 1px solid rgba(99,102,241,.55); border-radius: 0 7px 7px 0; }
+  .sp-part.manual { background: linear-gradient(180deg, rgba(45,212,191,.5), rgba(45,212,191,.26));
+    border-color: rgba(45,212,191,.6); }
+  .sp-part.manual:first-child { border-left-color: rgba(45,212,191,.6); }
+  .sp-part.manual:last-child { border-right-color: rgba(45,212,191,.6); }
+  .sp-part.over { background: linear-gradient(180deg, rgba(248,113,113,.55), rgba(248,113,113,.3)); border-color: var(--danger); }
+  .sp-cut { position: absolute; top: -7px; width: 26px; height: 54px; transform: translateX(-50%);
+    display: flex; align-items: center; justify-content: center; cursor: ew-resize; touch-action: none; padding: 0;
+    border: 0; background: transparent; color: var(--accent-2); }
+  .sp-cut::before { content: ""; width: 5px; height: 100%; border-radius: 99px; background: var(--accent-2);
+    box-shadow: 0 0 0 2px var(--panel), 0 2px 8px rgba(0,0,0,.5); }
+  .sp-cut.manual::before { background: var(--teal); }
+  .sp-cut:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 1px; }
+  .sp-cut.dragging::before { background: #fff; }
+  .sp-scale { display: flex; justify-content: space-between; margin-top: 4px; font-size: .66rem; color: var(--dim); font-variant-numeric: tabular-nums; }
+  .child-row .c-range { font-size: .68rem; font-weight: 500; color: var(--dim); white-space: nowrap; }
+
   /* ==================== Fit row ==================== */
   .fit-row { display: flex; gap: 8px; flex-wrap: wrap; }
   .seg-btn { border: 1px solid var(--line-strong); background: var(--panel-2); color: var(--dim);
@@ -341,7 +393,17 @@
   .frame-wrap { position: relative; border-radius: var(--r); overflow: hidden; background:
     repeating-conic-gradient(#141821 0% 25%, #10131a 0% 50%) 50% / 22px 22px;
     border: 1px solid var(--line-strong); aspect-ratio: var(--frame-ar, 9/16); max-height: 48vh; margin: 0 auto; width: auto; max-width: 100%; }
-  .frame-wrap video { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .frame-wrap video { width: 100%; height: 100%; display: block; }
+  /* M1 WYSIWYG: object-fit theo chế độ khung — pad/blur → contain, cover → cover. */
+  .frame-wrap video.main { object-fit: contain; position: relative; z-index: 1; }
+  .frame-wrap[data-fit="cover"] video.main { object-fit: cover; }
+  /* Pad: khung đen thay nền ca-rô. */
+  .frame-wrap[data-fit="pad"] { background: #000; }
+  /* Blur: lớp nền phủ full khung (cover) + blur 24px + hơi tối, lớp chính contain phía trên. */
+  .frame-wrap[data-fit="blur"] { background: #000; }
+  .frame-wrap video.bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+    filter: blur(24px) brightness(.55); transform: scale(1.12); display: none; }
+  .frame-wrap[data-fit="blur"] video.bg { display: block; }
   .frame-empty { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 8px;
     align-items: center; justify-content: center; text-align: center; padding: 20px;
     transition: opacity .25s; }
@@ -462,6 +524,12 @@
     align-items: flex-start; animation: toastIn .28s cubic-bezier(.21,1.02,.73,1); }
   .toast.out { animation: toastOut .25s ease forwards; }
   .toast .t-icon { font-size: 1rem; line-height: 1.3; }
+  .toast .t-msg { align-self: center; }
+  /* M7: nút hành động trong toast (Xem / Tải khi xuất xong). */
+  .toast .t-actions { display: flex; gap: 8px; align-self: center; }
+  .toast .t-btn { border: 1px solid var(--line-strong); background: var(--panel-solid); color: var(--text);
+    border-radius: 8px; padding: 6px 14px; font-size: .78rem; font-weight: 650; cursor: pointer; }
+  .toast .t-btn:hover { border-color: var(--accent); color: var(--accent-2); }
   .toast.ok { border-color: rgba(52,211,153,.4); } .toast.ok .t-icon { color: var(--success); }
   .toast.err { border-color: rgba(248,113,113,.45); } .toast.err .t-icon { color: var(--danger); }
   .toast.info .t-icon { color: var(--accent-2); }
@@ -474,9 +542,293 @@
     padding: 10px 14px; }
   .stat .s-val { font-size: 1.06rem; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
   .stat .s-label { font-size: .68rem; color: var(--faint); text-transform: uppercase; letter-spacing: .07em; margin-top: 1px; }
+
+  /* ==================== Lớp skin v2 (tham khảo uiverse.io + lucianlabs UX/UI) ====================
+     Nối thêm sau design system cũ: chỉ GHI ĐÈ bằng cùng selector hoặc selector cụ thể hơn,
+     không đổi id/class hiện có. Mọi animation tôn trọng prefers-reduced-motion (rule toàn cục ở trên). */
+  :root {
+    --ease-out: cubic-bezier(.22, 1, .36, 1);
+    --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+    --grad-accent: linear-gradient(135deg, #6366f1, #8b5cf6 55%, #2dd4bf);
+    --ring: linear-gradient(135deg, rgba(99,102,241,.5), rgba(255,255,255,.08) 35%, rgba(255,255,255,.05) 65%, rgba(45,212,191,.45));
+  }
+  @property --beam { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+
+  /* Nền aurora trôi chậm + lưới mờ (đằng sau nội dung) */
+  .aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+  .aurora i { position: absolute; width: 46vw; height: 46vw; min-width: 380px; min-height: 380px; border-radius: 50%;
+    filter: blur(70px); opacity: .32; will-change: transform; background: radial-gradient(circle, #6366f1, transparent 60%);
+    left: -8vw; top: -12vh; animation: drift 24s ease-in-out infinite alternate; }
+  .aurora i:nth-child(2) { background: radial-gradient(circle, #2dd4bf, transparent 60%); left: 48vw; top: 58vh; opacity: .26;
+    animation-duration: 30s; animation-delay: -8s; }
+  .aurora i:nth-child(3) { background: radial-gradient(circle, #a855f7, transparent 60%); left: 18vw; top: 78vh; opacity: .22;
+    animation-duration: 36s; animation-delay: -14s; }
+  @keyframes drift { to { transform: translate(12vw, -9vh) scale(1.15); } }
+  .aurora .grid { position: absolute; inset: 0;
+    background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+    background-size: 44px 44px; -webkit-mask-image: radial-gradient(ellipse at 50% -10%, #000 10%, transparent 70%);
+    mask-image: radial-gradient(ellipse at 50% -10%, #000 10%, transparent 70%); }
+  ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #3b4252, #262b36); }
+  ::selection { background: rgba(99,102,241,.4); }
+
+  /* Topbar: viền dưới phát sáng nhẹ */
+  .topbar::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(99,102,241,.55), rgba(45,212,191,.45), transparent); pointer-events: none; }
+  .logo-mark { box-shadow: 0 6px 20px -4px rgba(99,102,241,.7); animation: floaty 5s ease-in-out infinite; }
+  @keyframes floaty { 50% { transform: translateY(-2px); } }
+  .pill { background: var(--panel-2); }
+
+  /* Hero: vào lần lượt */
+  .hero-inner { box-shadow: 0 30px 80px -40px rgba(99,102,241,.45); }
+  .hero-inner > * { animation: rise .6s var(--ease-out) both; }
+  .hero-inner > *:nth-child(2) { animation-delay: .08s; }
+  .hero-inner > *:nth-child(3) { animation-delay: .16s; }
+  .hero-inner > *:nth-child(4) { animation-delay: .24s; }
+  @keyframes rise { from { opacity: 0; transform: translateY(12px); } }
+  .hero-step { position: relative; overflow: hidden; }
+  .hero-step .hs-no { position: relative; transition: background .25s, box-shadow .25s; }
+  .hero-step.current { border-color: rgba(99,102,241,.65);
+    box-shadow: 0 0 0 1px rgba(99,102,241,.25), 0 14px 34px -16px rgba(99,102,241,.65); }
+  .hero-step.current .hs-no::before { content: ""; position: absolute; inset: -4px; border-radius: 13px;
+    border: 2px solid rgba(99,102,241,.55); animation: ringPulse 1.8s ease-out infinite; }
+  @keyframes ringPulse { from { transform: scale(.9); opacity: .9; } to { transform: scale(1.4); opacity: 0; } }
+  .hero-step.done .hs-no { font-size: 0; background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 6px 16px -6px rgba(16,185,129,.7); }
+  .hero-step.done .hs-no::after { content: "✓"; font-size: 1rem; }
+
+  /* Card: viền gradient (mask 1px) + hiện dần khi cuộn tới */
+  .card { position: relative; isolation: isolate; border: 1px solid transparent;
+    background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.012));
+    box-shadow: 0 20px 60px -40px rgba(0,0,0,.8);
+    transition: opacity .55s var(--ease-out), transform .55s var(--ease-out), box-shadow .3s; }
+  .card::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; background: var(--ring);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude; pointer-events: none; z-index: -1; }
+  .card:hover { box-shadow: 0 26px 70px -36px rgba(99,102,241,.45); }
+  .card.export-card { background: linear-gradient(180deg, rgba(99,102,241,.12), rgba(45,212,191,.04)); }
+  html.reveal .card:not(.in) { opacity: 0; transform: translateY(14px); }
+  .sec-no { border: 0; color: #fff; background: linear-gradient(135deg, var(--accent), var(--teal)); box-shadow: 0 4px 12px -4px rgba(99,102,241,.7); }
+  .stat { background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.012)); }
+  .stat .s-val { background: linear-gradient(90deg, var(--text), var(--accent-2)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+
+  /* Nút: gradient chuyển động, viền sáng quay quanh nút Xuất (khi bật), ripple, nhấn co lại */
+  .btn { position: relative; overflow: hidden; border-radius: 12px; letter-spacing: .01em; }
+  .btn:active:not(:disabled) { transform: translateY(0) scale(.98); }
+  .btn-primary { background: linear-gradient(135deg, #6366f1, #7c3aed 55%, #2dd4bf 140%); background-size: 200% 200%;
+    box-shadow: 0 10px 26px -8px rgba(99,102,241,.7); transition: background-position .5s, transform .16s, box-shadow .2s; }
+  .btn-primary:hover:not(:disabled) { background-position: 100% 50%; transform: translateY(-2px); box-shadow: 0 16px 34px -10px rgba(99,102,241,.8); }
+  .btn-primary::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px;
+    background: conic-gradient(from var(--beam), transparent 0 66%, rgba(129,140,248,.95) 80%, rgba(45,212,191,1) 88%, transparent 100%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude;
+    animation: beamSpin 4s linear infinite; pointer-events: none; }
+  .btn-primary:disabled::before { display: none; }
+  .btn-primary[data-state="loading"] { animation: breathe 1.2s ease-in-out infinite; }
+  .btn-primary[data-state="loading"]::before { animation-duration: .9s; }
+  .btn-primary[data-state="done"] { background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 0 0 2px rgba(52,211,153,.45), 0 12px 28px -8px rgba(52,211,153,.7); }
+  .btn-primary[data-state="done"]::before { animation: none; background: linear-gradient(135deg, rgba(52,211,153,.9), rgba(45,212,191,.6)); }
+  @keyframes beamSpin { to { --beam: 360deg; } }
+  @keyframes breathe { 50% { box-shadow: 0 10px 30px -6px rgba(99,102,241,.95); } }
+  .btn-ghost { position: relative; overflow: hidden; }
+  .btn-ghost:hover { color: var(--text); border-color: var(--accent-2); background: var(--accent-dim); }
+  .btn-success { position: relative; overflow: hidden; }
+  .btn-success::after { content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%;
+    background: linear-gradient(100deg, transparent, rgba(255,255,255,.45), transparent); transform: skewX(-20deg); transition: left .55s var(--ease-out); }
+  .btn-success:hover::after { left: 125%; }
+  .kbd { font-family: var(--mono); font-size: .62rem; font-weight: 600; padding: 2px 6px; border-radius: 6px; line-height: 1;
+    background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.18); }
+  .ripple { position: absolute; border-radius: 50%; background: rgba(255,255,255,.35); transform: scale(0); pointer-events: none; z-index: 2;
+    animation: ripple .6s ease-out forwards; }
+  @keyframes ripple { to { transform: scale(1); opacity: 0; } }
+  .preset-chip, .seg-btn, .tab-btn, .hero-step { position: relative; overflow: hidden; }
+  .preset-chip::before, .hero-step .hs-no::before { z-index: 0; }
+  .preset-chip > * { position: relative; z-index: 1; }
+
+  /* Điều khiển phân đoạn: nhóm pill + con trỏ trượt (JS đặt vị trí; không JS vẫn dùng style cũ) */
+  .seg-row, .fit-row { gap: 6px; }
+  .seg-row.has-thumb, .fit-row.has-thumb { position: relative; display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 4px;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; }
+  .seg-row.has-thumb .seg-btn, .fit-row.has-thumb .seg-btn { border-color: transparent; background: transparent; z-index: 1; }
+  .seg-row.has-thumb .seg-btn.selected, .fit-row.has-thumb .seg-btn.selected { background: transparent; box-shadow: none; color: var(--accent-2); }
+  .tab-row { position: relative; }
+  .tab-row.has-thumb .tab-btn { z-index: 1; }
+  .tab-row.has-thumb .tab-btn.selected { background: transparent; color: var(--accent-2); box-shadow: none; }
+  .seg-thumb { position: absolute; z-index: 0; border-radius: 9px; pointer-events: none;
+    background: linear-gradient(135deg, rgba(99,102,241,.42), rgba(45,212,191,.22));
+    box-shadow: inset 0 0 0 1px rgba(129,140,248,.55), 0 6px 16px -6px rgba(99,102,241,.7);
+    transition: left .32s var(--ease-spring), top .32s var(--ease-spring), width .32s var(--ease-spring), height .32s var(--ease-spring), opacity .2s; }
+  .tab-row.has-thumb .seg-thumb { border-radius: 8px; background: linear-gradient(135deg, rgba(99,102,241,.38), rgba(139,92,246,.22)); }
+
+  /* Checkbox → công tắc trượt (vùng bấm 44px trên cảm ứng) */
+  input[type="checkbox"], .checkbox-row input[type="checkbox"], .prev-opts input[type="checkbox"] {
+    -webkit-appearance: none; appearance: none; width: 38px; height: 22px; min-width: 38px; min-height: 0; flex: none;
+    border-radius: 99px; background: #262c38; border: 1px solid var(--line-strong); position: relative; cursor: pointer;
+    vertical-align: middle; transition: background .25s, border-color .25s; }
+  input[type="checkbox"]::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+    background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.45); transition: transform .28s var(--ease-spring), width .2s; }
+  input[type="checkbox"]:checked { background: linear-gradient(135deg, #6366f1, #2dd4bf); border-color: transparent; }
+  input[type="checkbox"]:checked::after { transform: translateX(16px); }
+  input[type="checkbox"]:hover:checked::after { width: 19px; }
+  input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+  .checkbox-row { gap: 10px; }
+  @media (pointer: coarse) {
+    input[type="checkbox"], .checkbox-row input[type="checkbox"], .prev-opts input[type="checkbox"] { width: 44px; height: 44px; min-width: 44px; min-height: 44px; background: transparent; border-color: transparent; }
+    input[type="checkbox"]::before { content: ""; position: absolute; left: 3px; right: 3px; top: 11px; height: 22px; border-radius: 99px;
+      background: #262c38; border: 1px solid var(--line-strong); transition: background .25s; }
+    input[type="checkbox"]::after { top: 13px; left: 5px; }
+    input[type="checkbox"]:checked { background: transparent; }
+    input[type="checkbox"]:checked::before { background: linear-gradient(135deg, #6366f1, #2dd4bf); border-color: transparent; }
+    .kbd { display: none; }
+  }
+
+  /* Ô nhập / chọn / thanh kéo */
+  input[type="text"], input[type="number"], textarea, select { border-radius: 10px; transition: border-color .15s, box-shadow .2s, background .2s; }
+  input[type="text"]:hover, input[type="number"]:hover, select:hover, textarea:hover { border-color: rgba(129,140,248,.5); }
+  select { -webkit-appearance: none; appearance: none; padding-right: 30px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1.5l5 5 5-5' fill='none' stroke='%238b94a7' stroke-width='1.6' stroke-linecap='round'/></svg>");
+    background-repeat: no-repeat; background-position: right 10px center; background-size: 12px; }
+  select option { background: var(--panel-solid); color: var(--text); }
+  input[type="range"] { height: 6px; background: linear-gradient(to right, #6366f1, #2dd4bf var(--fill,50%), #262b36 var(--fill,50%)); }
+  input[type="range"]::-webkit-slider-thumb { border: 2px solid #fff; background: linear-gradient(135deg, #6366f1, #2dd4bf);
+    box-shadow: 0 0 0 4px var(--accent-dim), 0 2px 10px rgba(0,0,0,.5); }
+  input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.25); cursor: grabbing; }
+  input[type="range"]::-moz-range-thumb { border: 2px solid #fff; background: linear-gradient(135deg, #6366f1, #2dd4bf); box-shadow: 0 0 0 4px var(--accent-dim); }
+  input[type="color"] { border-radius: 10px; width: 38px; height: 32px; transition: box-shadow .2s, transform .15s; }
+  input[type="color"]:hover { box-shadow: 0 0 0 4px var(--accent-dim); transform: scale(1.06); }
+  .char-count { font-size: .72rem; color: var(--dim); text-align: right; min-height: 1em; font-variant-numeric: tabular-nums; }
+  .char-count:empty { display: none; }
+  .char-count.near { color: var(--warn); }
+
+  /* Vùng thả file: viền đứt gradient, sáng khi kéo */
+  .drop-zone { border: 1.5px dashed transparent; --dz-bg: rgba(255,255,255,.015);
+    background: linear-gradient(var(--dz-bg), var(--dz-bg)) padding-box,
+      linear-gradient(135deg, rgba(99,102,241,.6), rgba(139,92,246,.35) 50%, rgba(45,212,191,.55)) border-box;
+    transition: transform .2s var(--ease-out), box-shadow .2s; }
+  .drop-zone:hover { --dz-bg: var(--accent-dim); transform: translateY(-2px); box-shadow: 0 14px 34px -16px rgba(99,102,241,.7); }
+  .drop-zone.drag { --dz-bg: var(--accent-dim); transform: scale(1.02); border-color: transparent;
+    box-shadow: 0 0 0 4px var(--accent-dim), 0 0 44px -8px rgba(99,102,241,.8); animation: dzPulse .9s ease-in-out infinite alternate; }
+  @keyframes dzPulse { to { box-shadow: 0 0 0 6px var(--accent-dim), 0 0 60px -6px rgba(99,102,241,.95); } }
+  .drop-zone.has-file { --dz-bg: rgba(52,211,153,.07);
+    background: linear-gradient(var(--dz-bg), var(--dz-bg)) padding-box, linear-gradient(135deg, rgba(52,211,153,.7), rgba(45,212,191,.55)) border-box; }
+  .drop-zone .dz-icon { transition: transform .25s var(--ease-spring); }
+  .drop-zone:hover .dz-icon { transform: translateY(-3px) scale(1.08); }
+
+  /* Chip preset: viền gradient khi chọn, badge check nảy */
+  .preset-chip::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; background: var(--grad-accent);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .preset-chip.selected { border-color: transparent; background: linear-gradient(160deg, rgba(99,102,241,.2), rgba(45,212,191,.07));
+    box-shadow: 0 10px 26px -10px rgba(99,102,241,.55); }
+  .preset-chip.selected::before { opacity: 1; }
+  .preset-chip.selected .p-check { display: grid; animation: pop .35s var(--ease-spring); background: linear-gradient(135deg, var(--accent), var(--teal)); }
+  @keyframes pop { 0% { transform: scale(0); } 60% { transform: scale(1.3); } 100% { transform: scale(1); } }
+
+  /* Tiến độ: gradient chảy, hàng đang chạy sáng viền */
+  .progress-bar { height: 10px; background: #1a1f29; box-shadow: inset 0 1px 2px rgba(0,0,0,.5); }
+  .progress-fill { background: linear-gradient(90deg, #6366f1, #8b5cf6, #2dd4bf, #6366f1); background-size: 300% 100%;
+    animation: gradFlow 3s linear infinite; box-shadow: 0 0 12px rgba(99,102,241,.55); }
+  @keyframes gradFlow { to { background-position: 300% 0; } }
+  .progress-pct { text-shadow: 0 0 18px rgba(99,102,241,.6); }
+  .child-row { transition: border-color .25s, background .25s; }
+  .child-row:not(.done):not(.error) { border-color: rgba(99,102,241,.35); }
+  .child-row .c-fill { background: linear-gradient(90deg, #6366f1, #2dd4bf, #6366f1); background-size: 200% 100%; animation: gradFlow 2.4s linear infinite; }
+  .child-row.done .c-fill { animation: none; background: linear-gradient(90deg, #34d399, #10b981); }
+  .child-row .c-dl { background: rgba(45,212,191,.06); }
+
+  /* Toast: thuỷ tinh + thanh thời gian, dừng khi rê chuột; xếp lớp */
+  #toast-root { gap: 8px; }
+  .toast { position: relative; overflow: hidden; background: var(--glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-radius: 14px; animation: toastIn .32s var(--ease-spring); }
+  .toast::after { content: ""; position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; transform-origin: left;
+    background: linear-gradient(90deg, var(--accent), var(--teal)); animation: toastLife 3.4s linear forwards; }
+  .toast:hover::after { animation-play-state: paused; }
+  .toast:has(.t-actions)::after { animation-duration: 9s; }
+  .toast.ok::after { background: linear-gradient(90deg, #10b981, #34d399); }
+  .toast.err::after { background: linear-gradient(90deg, #ef4444, #f87171); }
+  @keyframes toastLife { to { transform: scaleX(0); } }
+  .toast .t-btn:hover { border-color: var(--accent); background: var(--accent-dim); }
+  .confetti { position: fixed; z-index: 95; width: 8px; height: 12px; border-radius: 2px; background: var(--c); pointer-events: none; margin: -6px 0 0 -4px;
+    animation: confetti .95s cubic-bezier(.2,.8,.3,1) forwards; }
+  @keyframes confetti { to { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0; } }
+
+  /* Modal: nền mờ, hộp nảy vào */
+  .modal-backdrop { backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); animation: fadeIn .2s ease; }
+  .modal-box { background: var(--panel-solid); box-shadow: var(--shadow-lg); animation: modalIn .32s var(--ease-spring); }
+  @keyframes modalIn { from { opacity: 0; transform: translateY(14px) scale(.96); } }
+  .out-view-btn:hover { border-color: var(--teal); background: rgba(45,212,191,.12); box-shadow: 0 0 0 3px rgba(45,212,191,.12); }
+
+  /* Danh sách audio: mini player nghe thử */
+  .audio-card.enhanced { grid-template-columns: auto auto 1fr auto; }
+  .mini-play { width: 30px; height: 30px; border-radius: 50%; border: 1px solid rgba(99,102,241,.45); padding: 0; flex: none;
+    background: radial-gradient(circle at 30% 30%, rgba(129,140,248,.35), rgba(99,102,241,.12)); color: var(--accent-2);
+    font-size: .68rem; display: grid; place-items: center; cursor: pointer; transition: transform .15s, box-shadow .2s; }
+  .mini-play:hover { transform: scale(1.08); box-shadow: 0 0 0 4px var(--accent-dim); }
+  .audio-card.playing .mini-play { background: linear-gradient(135deg, var(--accent), var(--teal)); color: #fff;
+    box-shadow: 0 0 0 4px var(--accent-dim), 0 0 18px rgba(99,102,241,.55); animation: pulse 1.4s ease-in-out infinite; }
+  .audio-card.playing { border-color: rgba(99,102,241,.5); }
+  .mini-prog { height: 3px; border-radius: 99px; background: var(--line); margin-top: 6px; overflow: hidden; }
+  .mini-prog i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--teal)); transition: width .2s linear; }
+  .mini-time { font-variant-numeric: tabular-nums; margin-left: 6px; }
+
+  /* Kho video: máy đo dung lượng có vạch, thẻ hiện lift, trạng thái rỗng thở nhẹ */
+  .lib-storage { background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.012)); border-radius: var(--r); }
+  .lib-storage-bar { height: 10px; border-radius: 6px;
+    background: repeating-linear-gradient(90deg, rgba(255,255,255,.06) 0 calc(10% - 1px), transparent calc(10% - 1px) 10%), var(--line); }
+  .lib-storage-fill { background: linear-gradient(90deg, #2dd4bf, #34d399, #2dd4bf); background-size: 200% 100%; animation: gradFlow 2.6s linear infinite;
+    box-shadow: 0 0 10px rgba(45,212,191,.5); }
+  .lib-storage-fill.warn { background: linear-gradient(90deg, #f59e0b, #f97316, #f59e0b); background-size: 200% 100%; animation: gradFlow 1.6s linear infinite; }
+  .lib-storage-fill.danger { background: linear-gradient(90deg, #ef4444, #dc2626, #ef4444); background-size: 200% 100%; animation: gradFlow 1.2s linear infinite; }
+  .lib-item { transition: transform .15s, border-color .15s, box-shadow .2s; }
+  .lib-item:hover { transform: translateY(-1px); border-color: rgba(99,102,241,.45); box-shadow: 0 10px 24px -14px rgba(99,102,241,.6); }
+  .lib-empty { animation: softPulse 1.8s ease-in-out infinite; }
+  @keyframes softPulse { 50% { opacity: .55; } }
+
+  /* Tooltip CSS cho nút icon (JS chép title → data-tip) */
+  [data-tip]::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translate(-50%, 4px);
+    background: var(--panel-solid); color: var(--text); border: 1px solid var(--line-strong); padding: 5px 9px; border-radius: 8px;
+    font-size: .72rem; font-weight: 500; white-space: nowrap; opacity: 0; pointer-events: none; z-index: 70; box-shadow: var(--shadow-lg);
+    transition: opacity .15s, transform .15s; }
+  [data-tip]:hover::after, [data-tip]:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+  .icon-btn[data-tip]::after { left: auto; right: 0; transform: translate(0, 4px); }
+  .icon-btn[data-tip]:hover::after, .icon-btn[data-tip]:focus-visible::after { transform: translate(0, 0); }
+  @media (pointer: coarse) { [data-tip]::after { display: none; } }
+
+  /* Nút về đầu trang */
+  .to-top { position: fixed; left: 22px; bottom: 22px; z-index: 80; width: 44px; height: 44px; border-radius: 14px;
+    border: 1px solid var(--line-strong); background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    color: var(--text); cursor: pointer; display: grid; place-items: center; font-size: 1.1rem; box-shadow: var(--shadow-lg);
+    opacity: 0; transform: translateY(16px) scale(.9); pointer-events: none; transition: opacity .25s, transform .25s var(--ease-spring), border-color .2s; }
+  .to-top.show { opacity: 1; transform: none; pointer-events: auto; }
+  .to-top:hover { border-color: var(--accent-2); }
+  .to-top span { display: block; transition: transform .2s var(--ease-spring); }
+  .to-top:hover span { transform: translateY(-4px); }
+
+  /* Theme sáng */
+  [data-theme="light"] .aurora i { opacity: .18; }
+  [data-theme="light"] .aurora .grid { background-image: linear-gradient(rgba(20,30,60,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(20,30,60,.05) 1px, transparent 1px); }
+  [data-theme="light"] .card { background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.78)); box-shadow: 0 16px 40px -28px rgba(20,30,60,.35); }
+  [data-theme="light"] .card::before { background: linear-gradient(135deg, rgba(99,102,241,.35), rgba(20,30,60,.08) 40%, rgba(45,212,191,.3)); }
+  [data-theme="light"] .card.export-card { background: linear-gradient(180deg, rgba(99,102,241,.10), rgba(45,212,191,.04)); }
+  [data-theme="light"] .seg-row.has-thumb, [data-theme="light"] .fit-row.has-thumb { background: rgba(20,30,60,.05); }
+  [data-theme="light"] .seg-thumb { background: linear-gradient(135deg, rgba(99,102,241,.22), rgba(45,212,191,.14)); }
+  [data-theme="light"] input[type="checkbox"] { background: #d5dae5; }
+  [data-theme="light"] input[type="checkbox"]::before { background: #d5dae5; }
+  [data-theme="light"] .drop-zone { --dz-bg: rgba(255,255,255,.75); }
+  [data-theme="light"] .drop-zone.has-file { --dz-bg: rgba(52,211,153,.10); }
+  [data-theme="light"] .progress-bar { background: #e3e7ef; }
+  [data-theme="light"] .child-row .c-bar { background: #e3e7ef; }
+  [data-theme="light"] .kbd { background: rgba(20,30,60,.08); border-color: rgba(20,30,60,.15); }
+  [data-theme="light"] .stat { background: linear-gradient(180deg, rgba(255,255,255,.9), rgba(255,255,255,.7)); }
+  [data-theme="light"] .lib-storage-bar { background: repeating-linear-gradient(90deg, rgba(20,30,60,.08) 0 calc(10% - 1px), transparent calc(10% - 1px) 10%), var(--line); }
+  [data-theme="light"] .btn-primary { background-size: 200% 200%; }
+  [data-theme="light"] .aurora i:nth-child(3) { opacity: .12; }
+  @media (max-width: 600px) {
+    .to-top { left: 14px; bottom: 14px; width: 42px; height: 42px; }
+    .hero-step.current .hs-no::before { display: none; }
+  }
 </style>
 </head>
 <body>
+<div class="aurora" aria-hidden="true"><i></i><i></i><i></i><span class="grid"></span></div>
 
 <header class="topbar">
   <div class="topbar-inner">
@@ -543,8 +895,8 @@
           <div class="dz-sub">MP3, WAV, M4A… ghép nối tiếp theo thứ tự</div>
         </div>
       </div>
-      <input type="file" id="file-video" accept="video/*" multiple hidden>
-      <input type="file" id="file-audio" accept="audio/*" multiple hidden>
+      <input type="file" id="file-video" accept="video/*" multiple hidden aria-label="Chọn file video nguồn">
+      <input type="file" id="file-audio" accept="audio/*" multiple hidden aria-label="Chọn file audio nguồn">
       <div class="clips-list" id="audio-list" style="margin-top:10px;"></div>
       <div class="clips-list" id="clips-list"></div>
       <div class="loop-note" id="loop-note" hidden></div>
@@ -559,9 +911,42 @@
       <div class="preset-grid" id="preset-grid"></div>
       <div class="custom-size-row" id="custom-size-row" hidden>
         <label for="custom-w">Tuỳ chỉnh W×H</label>
-        <input type="number" id="custom-w" min="16" max="7680" step="2" placeholder="1080">
+        <input type="number" id="custom-w" min="16" max="7680" step="2" placeholder="1080" aria-label="Chiều rộng tuỳ chỉnh (pixel)">
         <span style="color:var(--faint)">×</span>
-        <input type="number" id="custom-h" min="16" max="7680" step="2" placeholder="1920">
+        <input type="number" id="custom-h" min="16" max="7680" step="2" placeholder="1920" aria-label="Chiều cao tuỳ chỉnh (pixel)">
+      </div>
+      <!-- B2: chế độ khi audio dài hơn giới hạn preset — chọn chung cho mọi preset. -->
+      <div class="split-opts">
+        <div class="field full">
+          <label id="split-mode-label">Khi audio dài hơn giới hạn của preset</label>
+          <div class="seg-row" id="split-mode" role="radiogroup" aria-labelledby="split-mode-label">
+            <button type="button" class="seg-btn selected" data-split="cut" role="radio" aria-checked="true">Cắt cụt</button>
+            <button type="button" class="seg-btn" data-split="split" role="radio" aria-checked="false">Chia phần</button>
+          </div>
+          <div class="fast-note split-note" id="split-note-cut">Cắt cụt: bản xuất dừng đúng ở giới hạn của nền tảng (phần sau bị bỏ).</div>
+          <div class="fast-note split-note" id="split-note-split" hidden>Chia phần: xuất thành nhiều video nối tiếp, mỗi video ≤ giới hạn. Ưu tiên cắt tại đoạn im lặng gần mốc; xem trước và kéo điểm cắt ở dưới.</div>
+        </div>
+        <div id="split-label-opts" hidden>
+          <div class="checkbox-row"><input type="checkbox" id="opt-label-enable"> <label for="opt-label-enable">Gắn nhãn “Phần i/n” lên mỗi video</label></div>
+          <div class="label-detail" id="label-detail" hidden>
+            <div class="field">
+              <label id="label-position-label">Vị trí nhãn</label>
+              <div class="seg-row" id="label-position" role="radiogroup" aria-labelledby="label-position-label">
+                <button type="button" class="seg-btn selected" data-lpos="top" role="radio" aria-checked="true">Trên</button>
+                <button type="button" class="seg-btn" data-lpos="middle" role="radio" aria-checked="false">Giữa</button>
+                <button type="button" class="seg-btn" data-lpos="bottom" role="radio" aria-checked="false">Dưới</button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="opt-label-size">Cỡ chữ nhãn — <span class="value" id="label-size-value">36 px</span></label>
+              <input type="range" id="opt-label-size" min="16" max="120" step="2" value="36" aria-label="Cỡ chữ nhãn phần (pixel)">
+            </div>
+            <div class="field">
+              <label for="opt-label-color">Màu nhãn</label>
+              <input type="color" id="opt-label-color" value="#ffffff" aria-label="Màu nhãn phần">
+            </div>
+          </div>
+        </div>
       </div>
       <div class="dur-warnings" id="dur-warnings"></div>
     </div>
@@ -573,7 +958,8 @@
         <div class="sec-hint" id="frame-size-label"></div>
       </div>
       <div class="frame-wrap" id="frame-wrap">
-        <video id="preview-video" muted playsinline></video>
+        <video id="preview-video-bg" class="bg" muted playsinline></video>
+        <video id="preview-video" class="main" muted playsinline></video>
         <div class="ovl ovl-title pos-bottom" id="ovl-title"></div>
         <div class="ovl ovl-wm pos-bottom_right" id="ovl-wm"></div>
         <div class="wm-logo-prev pos-bottom_right" id="wm-logo-prev"><img alt=""></div>
@@ -649,20 +1035,20 @@
             <label for="txt-color">Màu chữ</label>
             <div class="color-pair">
               <input type="color" id="txt-color" value="#FFFFFF">
-              <input type="text" id="txt-color-hex" value="#FFFFFF" maxlength="7">
+              <input type="text" id="txt-color-hex" value="#FFFFFF" maxlength="7" aria-label="Mã màu chữ (hex)">
             </div>
           </div>
           <div class="field">
             <label for="txt-border-color">Màu viền</label>
             <div class="color-pair">
               <input type="color" id="txt-border-color" value="#000000">
-              <input type="text" id="txt-border-color-hex" value="#000000" maxlength="7">
+              <input type="text" id="txt-border-color-hex" value="#000000" maxlength="7" aria-label="Mã màu viền chữ (hex)">
             </div>
           </div>
           <div class="field">
             <label><input type="checkbox" id="txt-box-enable" style="vertical-align:-2px;margin-right:6px;">Nền chữ (box)</label>
             <div class="color-pair" id="txt-box-pair" hidden>
-              <input type="color" id="txt-box-color" value="#111827">
+              <input type="color" id="txt-box-color" value="#111827" aria-label="Màu nền chữ (box)">
               <input type="range" id="txt-box-opacity" min="10" max="100" step="5" value="80" title="Độ đục nền">
               <input type="range" id="txt-box-padding" min="4" max="48" step="2" value="16" title="Đệm nền (px @1080)">
             </div>
@@ -670,7 +1056,7 @@
           <div class="field">
             <label><input type="checkbox" id="txt-shadow-enable" style="vertical-align:-2px;margin-right:6px;">Bóng đổ</label>
             <div class="color-pair" id="txt-shadow-pair" hidden>
-              <input type="color" id="txt-shadow-color" value="#000000">
+              <input type="color" id="txt-shadow-color" value="#000000" aria-label="Màu bóng đổ chữ">
               <input type="range" id="txt-shadow-offset" min="1" max="12" step="1" value="3" title="Độ lệch bóng (px @1080)">
             </div>
           </div>
@@ -730,7 +1116,7 @@
             <label for="sub-color">Màu chữ</label>
             <div class="color-pair">
               <input type="color" id="sub-color" value="#FFFFFF">
-              <input type="text" id="sub-color-hex" value="#FFFFFF" maxlength="7">
+              <input type="text" id="sub-color-hex" value="#FFFFFF" maxlength="7" aria-label="Mã màu phụ đề (hex)">
             </div>
           </div>
           <div class="field full">
@@ -795,7 +1181,7 @@
             <label for="wm-color">Màu chữ</label>
             <div class="color-pair">
               <input type="color" id="wm-color" value="#FFFFFF">
-              <input type="text" id="wm-color-hex" value="#FFFFFF" maxlength="7">
+              <input type="text" id="wm-color-hex" value="#FFFFFF" maxlength="7" aria-label="Mã màu watermark (hex)">
             </div>
           </div>
           <div class="field">
@@ -803,7 +1189,7 @@
           </div>
           <div class="field full">
             <label><input type="checkbox" id="wm-moving" style="vertical-align:-2px;margin-right:6px;">Watermark di chuyển — đổi góc mỗi
-              <input type="number" id="wm-move-every" value="5" min="1" max="60" style="width:64px;display:inline-block;padding:3px 8px;"> giây, chống crop logo</label>
+              <input type="number" id="wm-move-every" value="5" min="1" max="60" style="width:64px;display:inline-block;padding:3px 8px;" aria-label="Đổi góc watermark mỗi bao nhiêu giây"> giây, chống crop logo</label>
           </div>
         </div>
         <div class="fast-note" id="wm-safezone-note">
@@ -836,7 +1222,15 @@
           <div class="field full">
             <div class="checkbox-row"><input type="checkbox" id="opt-fast"> <label for="opt-fast">Chế độ nhanh (giữ codec, điểm cắt theo keyframe)</label></div>
 <div class="checkbox-row"><input type="checkbox" id="opt-progress"> <label for="opt-progress">Thanh tiến độ (chạy theo thời lượng audio)</label></div>
+<div class="field" id="progress-color-field" hidden><label for="opt-progress-color">Màu thanh tiến độ</label><input type="color" id="opt-progress-color" value="#39FF14"></div>
 <div class="field"><label for="opt-viz">Visualizer âm thanh</label><select id="opt-viz"><option value="none">Tắt</option><option value="wave">Sóng âm (waveform)</option><option value="bars">Tần số (bars)</option><option value="spectrum">Quang phổ (spectrum)</option></select></div>
+<!-- M4: điều khiển visualizer chi tiết — chỉ hiện khi visualizer ≠ Tắt. Trùng tên trường backend. -->
+<div class="viz-opts" id="viz-opts" hidden>
+  <div class="field"><label for="opt-viz-position">Vị trí visualizer</label><select id="opt-viz-position"><option value="bottom">Dưới</option><option value="middle">Giữa</option><option value="top">Trên</option></select></div>
+  <div class="field"><label for="opt-viz-height">Chiều cao visualizer — <span class="value" id="viz-height-value">18%</span></label><input type="range" id="opt-viz-height" min="5" max="40" step="1" value="18" aria-label="Chiều cao visualizer theo phần trăm chiều cao khung"></div>
+  <div class="field"><label for="opt-viz-color">Màu visualizer</label><input type="color" id="opt-viz-color" value="#39FF14"></div>
+  <div class="field"><label for="opt-viz-opacity">Độ mờ — <span class="value" id="viz-opacity-value">90%</span></label><input type="range" id="opt-viz-opacity" min="0" max="100" step="1" value="90" aria-label="Độ mờ visualizer theo phần trăm"></div>
+</div>
 <div class="field"><label for="opt-quality">Chất lượng video</label><select id="opt-quality"><option value="balanced">Cân bằng (mặc định)</option><option value="high">Cao — nét hơn, chậm hơn</option><option value="fast">Nhanh — file nhỏ hơn</option></select></div>
             <div class="fast-warning" id="fast-warning"></div>
           </div>
@@ -862,8 +1256,10 @@
         <button class="btn btn-primary" id="btn-export" disabled>🚀 Xuất video</button>
         <button class="btn btn-ghost" id="btn-cancel" style="display:none;">Huỷ</button>
         <a class="btn btn-success" id="btn-download-zip" download style="display:none;">⬇ Tải xuống — zip</a>
+        <!-- M3: đặt lại toàn bộ tuỳ chọn về mặc định (file upload không đụng tới). -->
+        <button class="btn btn-ghost" id="btn-reset-settings" type="button">↺ Đặt lại mặc định</button>
       </div>
-      <div class="progress-wrap" id="progress-wrap">
+      <div class="progress-wrap" id="progress-wrap" role="status" aria-live="polite">
         <div class="progress-top">
           <div class="progress-label" id="progress-label">Đang xử lý… 0%</div>
           <div class="progress-pct" id="progress-pct">0%</div>
@@ -871,7 +1267,7 @@
         <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
         <div class="child-list" id="child-list"></div>
       </div>
-      <div class="error-box" id="error-box"></div>
+      <div class="error-box" id="error-box" role="alert" aria-live="polite"></div>
     </div>
     <div class="card" id="card-library">
       <div class="sec-head">
@@ -943,15 +1339,24 @@
     logoURL: null,
     fontUploads: new Map(),
     fonts: [],
+    // B2: chế độ khi audio dài hơn giới hạn preset ("cut" | "split"), vị trí
+    // nhãn "Phần i/n", và điểm cắt kéo tay theo preset id (chỉ giữ khi độ
+    // dài audio còn nguyên — đổi audio thì điểm tay không còn nghĩa gì).
+    splitMode: "cut",
+    labelPosition: "top",
+    manualCuts: {},
   };
 
   // ======================================================= tiện ích
+  // M5: tự chọn KB/MB/GB — dưới 10 đơn vị hiện 2 chữ số thập phân cho chính
+  // xác, từ 10 trở lên hiện 1 chữ số cho gọn. Thanh dung lượng kho dùng chung.
   function formatBytes(bytes) {
     if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
     const units = ["B", "KB", "MB", "GB"];
     let i = 0;
     while (bytes >= 1024 && i < units.length - 1) { bytes /= 1024; i++; }
-    return `${bytes.toFixed(bytes < 10 && i > 0 ? 1 : 0)} ${units[i]}`;
+    const digits = i === 0 ? 0 : (bytes < 10 ? 2 : 1);
+    return `${bytes.toFixed(digits)} ${units[i]}`;
   }
   function formatDuration(sec) {
     if (!Number.isFinite(sec) || sec <= 0) return "0:00";
@@ -965,16 +1370,34 @@
 
   // ======================================================= toast
   const TOAST_ICON = { ok: "✓", err: "⚠", info: "ℹ" };
-  function toast(msg, type = "info", ms = 3400) {
+  function toast(msg, type = "info", ms = 3400, actions = null) {
     const root = $("toast-root");
     const el = document.createElement("div");
     el.className = `toast ${type}`;
-    el.innerHTML = `<span class="t-icon">${TOAST_ICON[type] || TOAST_ICON.info}</span><span>${escapeHtml(msg)}</span>`;
+    // M7: toast có thể kèm nút hành động (vd. "Xem" / "Tải" khi xuất xong).
+    let actionsHtml = "";
+    if (actions && actions.length) {
+      actionsHtml = `<span class="t-actions">${actions
+        .map((a, i) => `<button type="button" class="t-btn" data-ti="${i}">${escapeHtml(a.label)}</button>`)
+        .join("")}</span>`;
+    }
+    el.innerHTML = `<span class="t-icon">${TOAST_ICON[type] || TOAST_ICON.info}</span><span class="t-msg">${escapeHtml(msg)}</span>${actionsHtml}`;
+    if (actions && actions.length) {
+      el.querySelectorAll(".t-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const a = actions[Number(btn.dataset.ti)];
+          if (a && typeof a.onClick === "function") a.onClick();
+          el.remove();
+        });
+      });
+    }
     root.appendChild(el);
+    // Có nút thì giữ lâu hơn để kịp bấm.
+    const life = actions && actions.length ? Math.max(ms, 9000) : ms;
     setTimeout(() => {
       el.classList.add("out");
       setTimeout(() => el.remove(), 260);
-    }, ms);
+    }, life);
   }
 
   // ======================================================= error box
@@ -1050,6 +1473,11 @@
       });
       grid.appendChild(chip);
     }
+    // M3: chip vừa render xong — đánh dấu selected theo state đã khôi phục
+    // từ localStorage (restoreSettings chạy trước loadPresets async).
+    document.querySelectorAll(".preset-chip").forEach((c) => {
+      c.classList.toggle("selected", state.selectedPresets.has(c.dataset.id));
+    });
   }
 
   function togglePreset(id) {
@@ -1107,10 +1535,19 @@
         return;
       }
       const parts = [];
+      // B2: chế độ chia phần → preset vượt giới hạn sinh N file "_phan1…_phanN".
+      const label = (f) => {
+        const p = state.presets.find((x) => x.id === f.preset_id);
+        if (state.splitMode !== "split" || !state.audioDuration || !p || !p.max_duration_sec || state.audioDuration <= p.max_duration_sec) {
+          return `📁 ${f.name}`;
+        }
+        const base = f.name.replace(/\.[a-z0-9]+$/i, "");
+        return `📁 ${base}_phan1 … ${base}_phan${splitCount(state.audioDuration, p.max_duration_sec)}${f.name.slice(base.length)}`;
+      };
       if (presets.length <= 1) {
-        parts.push(data.files.length ? `📁 ${data.files[0].name}` : `📁 ${data.stem}.mp4`);
+        parts.push(data.files.length ? label(data.files[0]) : `📁 ${data.stem}.mp4`);
       } else {
-        for (const f of data.files) parts.push(`📁 ${f.name}`);
+        for (const f of data.files) parts.push(label(f));
         if (data.zip) parts.push(`🗜 ${data.zip}`);
       }
       box.textContent = parts.join("   ·   ");
@@ -1137,19 +1574,282 @@
     return out;
   }
 
+  // ======================================================= B2: chia phần
+  // Xem trước khớp quy tắc backend (split::plan_splits): số phần tối thiểu
+  // = ceil(độ dài / giới hạn), chia đều cho các phần ngang nhau. Khi xuất,
+  // server ưu tiên dời điểm TỰ ĐỘNG sang đoạn im lặng gần mốc (±15% độ dài
+  // phần); điểm cắt người dùng đã kéo thì dùng đúng. Điểm kéo tay luôn bị kẹp
+  // để không phần nào ngắn hơn 5s hay dài hơn giới hạn.
+  const SPLIT_MIN_PART = 5;
+
+  function round2(v) {
+    return Math.round(v * 100) / 100;
+  }
+
+  function splitCount(duration, max) {
+    return Math.max(1, Math.ceil((duration - 1e-6) / max));
+  }
+
+  // Điểm chia đều: [D/n, 2D/n, …] (n-1 điểm).
+  function autoCuts(duration, max) {
+    const n = splitCount(duration, max);
+    const out = [];
+    for (let i = 1; i < n; i++) out.push(round2((duration * i) / n));
+    return out;
+  }
+
+  // Preset đang chọn mà audio dài hơn giới hạn (audio_only không bao giờ chia).
+  function overLimitTargets() {
+    if (!state.audioDuration) return [];
+    return selectedTargets().filter(
+      (t) => t.id !== "audio_only" && t.preset && t.preset.max_duration_sec && state.audioDuration > t.preset.max_duration_sec,
+    );
+  }
+
+  function targetName(t) {
+    return t.id === "custom" ? "Tuỳ chỉnh" : t.preset.name || t.preset.label || t.id;
+  }
+
+  // Thời lượng một phần: dưới 1 phút hiện "8.3s" cho chính xác, lâu hơn "8:20".
+  function fmtPart(sec) {
+    return sec < 60 ? `${sec.toFixed(1)}s` : formatDuration(sec);
+  }
+
+  // Điểm cắt đang có hiệu lực: tay (còn hợp lệ với audio hiện tại) hoặc tự động.
+  function effectiveCuts(id, duration, max) {
+    const m = state.manualCuts[id];
+    if (m && m.duration === duration && m.cuts.length) return { cuts: m.cuts, manual: true };
+    return { cuts: autoCuts(duration, max), manual: false };
+  }
+
+  // Khoảng di động hợp lệ của điểm cắt thứ i: phần trái/phải ∈ [5s, giới hạn].
+  function cutRange(cuts, i, duration, max) {
+    const prev = i === 0 ? 0 : cuts[i - 1];
+    const next = i === cuts.length - 1 ? duration : cuts[i + 1];
+    return [Math.max(prev + SPLIT_MIN_PART, next - max), Math.min(next - SPLIT_MIN_PART, prev + max)];
+  }
+
+  function clampCut(cuts, i, t, duration, max) {
+    const [lo, hi] = cutRange(cuts, i, duration, max);
+    if (lo > hi) return cuts[i];
+    return round2(Math.min(Math.max(t, lo), hi));
+  }
+
+  // Ghi điểm cắt tay thứ i của một preset (source = điểm tự động hiện tại).
+  function setCut(id, i, t, duration, max) {
+    const list = effectiveCuts(id, duration, max).cuts.slice();
+    list[i] = clampCut(list, i, t, duration, max);
+    state.manualCuts[id] = { duration, cuts: list };
+  }
+
+  // Bỏ điểm tay không còn nghĩa: đổi audio / bỏ chọn preset.
+  function pruneManualCuts() {
+    for (const id of Object.keys(state.manualCuts)) {
+      const m = state.manualCuts[id];
+      if (!state.selectedPresets.has(id) || m.duration !== state.audioDuration || !m.cuts.length) delete state.manualCuts[id];
+    }
+  }
+
+  // Chỉ gửi điểm đã kéo tay — preset còn lại để server chia tự động (im lặng).
+  function manualCutsPayload() {
+    const out = {};
+    for (const t of overLimitTargets()) {
+      const m = state.manualCuts[t.id];
+      if (m && m.duration === state.audioDuration && m.cuts.length) out[t.id] = m.cuts.slice();
+    }
+    return out;
+  }
+
   function updateDurationWarnings() {
     const box = $("dur-warnings");
     box.innerHTML = "";
     if (!state.audioDuration) return;
-    for (const t of selectedTargets()) {
+    pruneManualCuts();
+    const split = state.splitMode === "split";
+    for (const t of overLimitTargets()) {
       const p = t.preset;
-      if (p && p.max_duration_sec && state.audioDuration > p.max_duration_sec) {
-        const row = document.createElement("div");
-        row.className = "warn-row";
-        row.textContent = `⚠ ${t.id === "custom" ? "Tuỳ chỉnh" : p.name || p.label || t.id}: audio ${formatDuration(state.audioDuration)} vượt giới hạn ${formatDuration(p.max_duration_sec)} — bản xuất sẽ được cắt còn ${formatDuration(p.max_duration_sec)} (đúng chuẩn nền tảng).`;
-        box.appendChild(row);
+      const name = targetName(t);
+      const row = document.createElement("div");
+      row.className = "warn-row";
+      if (split) {
+        row.textContent = `⚠ ${name}: Audio ${formatDuration(state.audioDuration)} > ${formatDuration(p.max_duration_sec)} → sẽ chia thành ${splitCount(state.audioDuration, p.max_duration_sec)} phần.`;
+      } else {
+        row.textContent = `⚠ ${name}: audio ${formatDuration(state.audioDuration)} vượt giới hạn ${formatDuration(p.max_duration_sec)} — bản xuất sẽ được cắt còn ${formatDuration(p.max_duration_sec)} (đúng chuẩn nền tảng).`;
       }
+      box.appendChild(row);
+      if (split) box.appendChild(buildSplitPlan(t.id, name, state.audioDuration, p.max_duration_sec));
     }
+  }
+
+  // Bản xem trước điểm cắt của một preset: số phần, thời lượng từng phần,
+  // thanh thời gian có điểm kéo tay (chuột / cảm ứng / bàn phím).
+  function buildSplitPlan(id, name, duration, max) {
+    const plan = document.createElement("div");
+    plan.className = "split-plan";
+    plan.dataset.preset = id;
+
+    const head = document.createElement("div");
+    head.className = "sp-head";
+    const title = document.createElement("span");
+    const reset = document.createElement("button");
+    reset.type = "button";
+    reset.className = "sp-reset";
+    reset.textContent = "↺ Tự động";
+    reset.title = "Về chia đều tự động (server ưu tiên cắt tại đoạn im lặng)";
+    reset.addEventListener("click", () => {
+      delete state.manualCuts[id];
+      paintSplitPlan(plan, id, duration, max);
+    });
+    head.appendChild(title);
+    head.appendChild(reset);
+    plan.appendChild(head);
+
+    const { cuts } = effectiveCuts(id, duration, max);
+    const tl = document.createElement("div");
+    tl.className = "sp-timeline";
+    for (let i = 0; i <= cuts.length; i++) {
+      const part = document.createElement("div");
+      part.className = "sp-part";
+      tl.appendChild(part);
+    }
+    cuts.forEach((_, i) => {
+      const h = document.createElement("button");
+      h.type = "button";
+      h.className = "sp-cut";
+      h.dataset.index = String(i);
+      h.setAttribute("role", "slider");
+      h.setAttribute("aria-label", `${name}: điểm cắt ${i + 1}`);
+      attachCutDrag(h, plan, id, i, duration, max);
+      tl.appendChild(h);
+    });
+    plan.appendChild(tl);
+
+    const scale = document.createElement("div");
+    scale.className = "sp-scale";
+    const a = document.createElement("span");
+    a.textContent = "0:00";
+    const b = document.createElement("span");
+    b.textContent = formatDuration(duration);
+    scale.appendChild(a);
+    scale.appendChild(b);
+    plan.appendChild(scale);
+
+    paintSplitPlan(plan, id, duration, max);
+    return plan;
+  }
+
+  // Vẽ lại (tại chỗ, không tạo lại DOM để điểm đang kéo không bị thay thế).
+  function paintSplitPlan(plan, id, duration, max) {
+    const { cuts, manual } = effectiveCuts(id, duration, max);
+    const parts = plan.querySelectorAll(".sp-part");
+    const handles = plan.querySelectorAll(".sp-cut");
+    const bounds = [0, ...cuts, duration];
+    const lengths = [];
+    parts.forEach((el, i) => {
+      const len = bounds[i + 1] - bounds[i];
+      lengths.push(len);
+      el.style.flexBasis = `${(len / duration) * 100}%`;
+      el.classList.toggle("manual", manual);
+      el.classList.toggle("over", len > max + 1e-6);
+      el.textContent = fmtPart(len);
+      el.title = `Phần ${i + 1}/${parts.length}: ${formatDuration(bounds[i])} – ${formatDuration(bounds[i + 1])} (${fmtPart(len)})`;
+    });
+    handles.forEach((h, i) => {
+      const [lo, hi] = cutRange(cuts, i, duration, max);
+      h.style.left = `${(cuts[i] / duration) * 100}%`;
+      h.classList.toggle("manual", manual);
+      h.setAttribute("aria-valuemin", String(round2(lo)));
+      h.setAttribute("aria-valuemax", String(round2(hi)));
+      h.setAttribute("aria-valuenow", String(cuts[i]));
+      h.setAttribute("aria-valuetext", `Điểm cắt ${i + 1} tại ${formatDuration(cuts[i])}`);
+      h.title = `Điểm cắt ${i + 1}: ${formatDuration(cuts[i])} — kéo để đổi, hoặc dùng phím mũi tên (Shift + mũi tên: 5s)`;
+    });
+    const title = plan.querySelector(".sp-head span");
+    title.textContent = "";
+    const b = document.createElement("b");
+    b.textContent = `${parts.length} phần`;
+    title.appendChild(b);
+    title.appendChild(document.createTextNode(` · ${lengths.map(fmtPart).join(" · ")}`));
+    plan.querySelector(".sp-reset").hidden = !manual;
+  }
+
+  function attachCutDrag(handle, plan, id, i, duration, max) {
+    let rect = null;
+    const timeline = () => plan.querySelector(".sp-timeline");
+    const move = (clientX) => {
+      if (!rect) rect = timeline().getBoundingClientRect();
+      const frac = (clientX - rect.left) / Math.max(1, rect.width);
+      setCut(id, i, frac * duration, duration, max);
+      paintSplitPlan(plan, id, duration, max);
+    };
+    handle.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      handle.setPointerCapture(e.pointerId);
+      handle.classList.add("dragging");
+      rect = null;
+      move(e.clientX);
+    });
+    handle.addEventListener("pointermove", (e) => {
+      if (handle.hasPointerCapture(e.pointerId)) move(e.clientX);
+    });
+    const end = () => {
+      handle.classList.remove("dragging");
+      rect = null;
+    };
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+    handle.addEventListener("keydown", (e) => {
+      const cur = effectiveCuts(id, duration, max).cuts[i];
+      const step = e.shiftKey ? 5 : 1;
+      let next = null;
+      if (e.key === "ArrowLeft" || e.key === "ArrowDown") next = cur - step;
+      else if (e.key === "ArrowRight" || e.key === "ArrowUp") next = cur + step;
+      else if (e.key === "Home") next = 0;
+      else if (e.key === "End") next = duration;
+      else return;
+      e.preventDefault();
+      setCut(id, i, next, duration, max);
+      paintSplitPlan(plan, id, duration, max);
+    });
+  }
+
+  function syncSplitControls() {
+    const split = state.splitMode === "split";
+    $("split-mode").querySelectorAll(".seg-btn").forEach((b) => {
+      const on = b.dataset.split === state.splitMode;
+      b.classList.toggle("selected", on);
+      b.setAttribute("aria-checked", String(on));
+    });
+    $("split-note-cut").hidden = split;
+    $("split-note-split").hidden = !split;
+    $("split-label-opts").hidden = !split;
+    $("label-detail").hidden = !$("opt-label-enable").checked;
+    $("label-position").querySelectorAll(".seg-btn").forEach((b) => {
+      const on = b.dataset.lpos === state.labelPosition;
+      b.classList.toggle("selected", on);
+      b.setAttribute("aria-checked", String(on));
+    });
+    $("label-size-value").textContent = `${$("opt-label-size").value} px`;
+  }
+
+  $("split-mode").addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-split]");
+    if (!btn) return;
+    state.splitMode = btn.dataset.split;
+    syncSplitControls();
+    updateDurationWarnings();
+    scheduleNamePreview();
+  });
+  $("label-position").addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-lpos]");
+    if (!btn) return;
+    state.labelPosition = btn.dataset.lpos;
+    syncSplitControls();
+  });
+  for (const id of ["opt-label-enable", "opt-label-size", "opt-label-color"]) {
+    $(id).addEventListener("input", syncSplitControls);
+    $(id).addEventListener("change", syncSplitControls);
   }
 
   // ======================================================= drop zones
@@ -1476,6 +2176,16 @@
     if (e.target.checked) $("preview-video").play().catch(() => {});
     else $("preview-video").pause();
   });
+  // M1: đồng bộ lớp nền blur với lớp chính — cùng chạy/cùng dừng/cùng seek.
+  {
+    const v = $("preview-video");
+    const bg = $("preview-video-bg");
+    v.addEventListener("play", () => bg.play().catch(() => {}));
+    v.addEventListener("pause", () => bg.pause());
+    v.addEventListener("seeked", () => { bg.currentTime = v.currentTime; });
+    // Lặp lại từ đầu để nền không đứng hình khi chính đứng.
+    v.addEventListener("ended", () => { bg.currentTime = 0; });
+  }
   // A2: gõ tên / bật bỏ dấu → cập nhật xem trước tên file.
   $("opt-name").addEventListener("input", scheduleNamePreview);
   $("opt-name-strip").addEventListener("change", scheduleNamePreview);
@@ -1498,11 +2208,20 @@
   function updatePreviewFrameInner() {
     const wrap = $("frame-wrap");
     const video = $("preview-video");
+    const videoBg = $("preview-video-bg");
+    // M1 WYSIWYG: chế độ khung quyết định object-fit của preview (CSS theo
+    // data-fit), đổi chế độ/preset đều gọi lại hàm này nên tự cập nhật.
+    wrap.dataset.fit = state.fitMode;
     const first = state.clips[0];
     $("frame-empty").classList.toggle("hide", !!first);
     if (first) {
       if (video.src !== first.url) video.src = first.url;
+      // Lớp nền blur: cùng nguồn, đồng bộ thời gian khi seek.
+      if (videoBg.src !== first.url) videoBg.src = first.url;
       if ($("opt-autoplay").checked) video.play().catch(() => {});
+    } else {
+      video.removeAttribute("src");
+      videoBg.removeAttribute("src");
     }
     const frame = currentFrameSize();
     const vw = first?.videoWidth || 1080;
@@ -1545,6 +2264,173 @@
       : "0:00";
     $("stat-presets").textContent = state.selectedPresets.size;
   };
+
+  // ======================================================= M3: nhớ cấu hình (localStorage)
+  // Lưu MỌI tuỳ chọn không phải file: preset, chế độ khung, chữ overlay,
+  // phụ đề, watermark, âm lượng/fade/xfade, visualizer, chất lượng, tên
+  // sản phẩm + bỏ dấu. File upload (video/audio/srt/logo/font) KHÔNG lưu.
+  const SETTINGS_KEY = "rvm-settings";
+  const SETTINGS_VERSION = 1;
+  // Điều khiển mặc định theo HTML — dùng cho "Đặt lại mặc định" (clone từ
+  // DOM lúc mới tải để luôn đúng nguồn sự thật, kể cả khi HTML đổi sau này).
+  let DEFAULT_CONTROL_SNAPSHOT = null;
+
+  function settingsControlIds() {
+    return [
+      // Nguồn / khung / tên
+      "opt-volume", "opt-fade", "opt-fast", "opt-quality", "opt-xfade", "opt-transition",
+      "opt-name", "opt-name-strip",
+      // B2: nhãn "Phần i/n" (chế độ chia/cắt và vị trí nhãn lưu ở __splitMode / __labelPosition)
+      "opt-label-enable", "opt-label-size", "opt-label-color",
+      // Visualizer + thanh tiến độ (M4)
+      "opt-viz", "opt-viz-position", "opt-viz-height", "opt-viz-color", "opt-viz-opacity",
+      "opt-progress", "opt-progress-color",
+      // Chữ overlay
+      "txt-enable", "txt-content", "txt-font", "txt-size", "txt-color", "txt-color-hex",
+      "txt-border", "txt-border-color", "txt-border-color-hex", "txt-start", "txt-end",
+      "txt-box-enable", "txt-box-color", "txt-box-opacity", "txt-box-padding",
+      "txt-shadow-enable", "txt-shadow-color", "txt-shadow-offset",
+      "txt-spacing", "txt-uppercase",
+      // Phụ đề
+      "sub-enable", "sub-size", "sub-color", "sub-color-hex", "sub-font",
+      // Watermark
+      "wm-enable", "wm-name", "wm-size", "wm-color", "wm-color-hex", "wm-border",
+      "wm-opacity", "wm-margin", "wm-position", "wm-logo-scale", "wm-moving", "wm-move-every", "wm-shadow",
+      // Kích thước tuỳ chỉnh
+      "custom-w", "custom-h",
+    ];
+  }
+
+  function readControl(el) {
+    if (el.type === "checkbox") return el.checked;
+    return el.value;
+  }
+  function writeControl(el, v) {
+    if (el.type === "checkbox") el.checked = !!v;
+    else if (v !== undefined && v !== null && String(v) !== "") el.value = v;
+  }
+
+  function collectSettings() {
+    const out = { version: SETTINGS_VERSION };
+    for (const id of settingsControlIds()) {
+      const el = $(id);
+      if (el) out[id] = readControl(el);
+    }
+    out.__presets = [...state.selectedPresets];
+    out.__fitMode = state.fitMode;
+    out.__txtPosition = segValue("txt-position")?.pos || null;
+    out.__wmKind = segValue("wm-kind")?.kind || null;
+    out.__subSource = state.subSource;
+    out.__splitMode = state.splitMode;
+    out.__labelPosition = state.labelPosition;
+    return out;
+  }
+
+  function applySettings(s) {
+    if (!s || typeof s !== "object") return;
+    for (const id of settingsControlIds()) {
+      if (!(id in s)) continue;
+      const el = $(id);
+      if (el) writeControl(el, s[id]);
+    }
+    if (Array.isArray(s.__presets)) {
+      state.selectedPresets = new Set(s.__presets.filter((p) => typeof p === "string"));
+    }
+    if (typeof s.__fitMode === "string" && ["cover", "pad", "blur"].includes(s.__fitMode)) {
+      state.fitMode = s.__fitMode;
+      $("fit-row").querySelectorAll(".seg-btn").forEach((b) =>
+        b.classList.toggle("selected", b.dataset.fit === s.__fitMode));
+    }
+    if (s.__txtPosition) {
+      $("txt-position").querySelectorAll(".seg-btn").forEach((b) =>
+        b.classList.toggle("selected", b.dataset.pos === s.__txtPosition));
+    }
+    if (s.__wmKind) {
+      $("wm-kind").querySelectorAll(".seg-btn").forEach((b) =>
+        b.classList.toggle("selected", b.dataset.kind === s.__wmKind));
+    }
+    if (s.__subSource === "auto" || s.__subSource === "file") {
+      state.subSource = s.__subSource;
+      $("sub-source-row").querySelectorAll(".seg-btn").forEach((b) =>
+        b.classList.toggle("selected", b.dataset.subsrc === s.__subSource));
+      $("sub-file-field").style.display = state.subSource === "file" ? "" : "none";
+      $("sub-auto-note").style.display = state.subSource === "auto" ? "" : "none";
+    }
+    // B2: chế độ cắt cụt / chia phần + vị trí nhãn (bản lưu cũ chưa có → giữ mặc định).
+    if (s.__splitMode === "cut" || s.__splitMode === "split") state.splitMode = s.__splitMode;
+    if (["top", "middle", "bottom"].includes(s.__labelPosition)) state.labelPosition = s.__labelPosition;
+    syncSplitControls();
+  }
+
+  let saveSettingsTimer = null;
+  function saveSettingsNow() {
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(collectSettings()));
+    } catch { /* localStorage đầy/bị chặn — bỏ qua, không phá luồng */ }
+  }
+  function scheduleSaveSettings() {
+    if (saveSettingsTimer) clearTimeout(saveSettingsTimer);
+    saveSettingsTimer = setTimeout(saveSettingsNow, 400);
+  }
+
+  function restoreSettings() {
+    let raw = null;
+    try {
+      raw = localStorage.getItem(SETTINGS_KEY);
+    } catch { return; /* bị chặn — dùng mặc định */ }
+    if (!raw) return;
+    try {
+      const s = JSON.parse(raw);
+      // Sai version / hỏng cấu trúc → bỏ qua, dùng mặc định.
+      if (!s || s.version !== SETTINGS_VERSION) return;
+      applySettings(s);
+    } catch { /* JSON hỏng — bỏ qua */ }
+  }
+
+  // Chụp trạng thái mặc định từ DOM (trước khi restore) để nút reset dùng.
+  function snapshotDefaults() {
+    DEFAULT_CONTROL_SNAPSHOT = collectSettings();
+  }
+
+  function resetSettings() {
+    if (!DEFAULT_CONTROL_SNAPSHOT) return;
+    state.manualCuts = {}; // điểm kéo tay phụ thuộc audio — không thuộc cấu hình
+    applySettings(DEFAULT_CONTROL_SNAPSHOT);
+    saveSettingsNow();
+    // Làm mới mọi phần phụ thuộc UI theo giá trị mới.
+    syncVizControls();
+    syncPresetUI();
+    updateOverlayPreview();
+    updatePreviewFrame();
+    updateDurationWarnings();
+    updateStats();
+    refreshExportButton();
+    scheduleNamePreview();
+    document.querySelectorAll('input[type="range"]').forEach(paintSlider);
+    toast("Đã đặt lại mọi tuỳ chọn về mặc định.", "ok");
+  }
+  $("btn-reset-settings").addEventListener("click", () => {
+    if (window.confirm("Đặt lại toàn bộ tuỳ chọn về mặc định?\n(File đã chọn — video, audio, phụ đề, logo, font — được giữ nguyên.)")) {
+      resetSettings();
+    }
+  });
+
+  // Mọi tương tác tuỳ chọn → lưu lại (debounce). input+change phủ mọi loại
+  // control; file upload không nằm trong settingsControlIds nên không lưu.
+  for (const id of settingsControlIds()) {
+    const el = $(id);
+    if (!el) continue;
+    el.addEventListener("input", scheduleSaveSettings);
+    el.addEventListener("change", scheduleSaveSettings);
+  }
+  // Trạng thái không phải control cũng cần lưu: preset / khung / vị trí.
+  document.addEventListener("click", (e) => {
+    const t = e.target;
+    if (t instanceof Element && t.closest(".preset-chip, .fit-row .seg-btn, #txt-position .seg-btn, #wm-kind .seg-btn, #sub-source-row .seg-btn, #split-mode .seg-btn, #label-position .seg-btn")) {
+      scheduleSaveSettings();
+    }
+  });
+  window.addEventListener("beforeunload", saveSettingsNow);
 
   // ======================================================= export
   function canExport() {
@@ -1598,7 +2484,27 @@
       text: overlay.text,
       subtitle: overlay.subtitle,
       watermark: overlay.watermark,
-      visuals: { visualizer: $("opt-viz").value, progress_bar: $("opt-progress").checked },
+      // M4: gửi đủ trường visuals — trùng tên backend (visualizer_position,
+      // visualizer_height_pct, visualizer_color, visualizer_opacity_pct,
+      // progress_color).
+      visuals: {
+        visualizer: $("opt-viz").value,
+        visualizer_position: $("opt-viz-position").value,
+        visualizer_height_pct: Number($("opt-viz-height").value),
+        visualizer_color: $("opt-viz-color").value,
+        visualizer_opacity_pct: Number($("opt-viz-opacity").value),
+        progress_bar: $("opt-progress").checked,
+        progress_color: $("opt-progress-color").value,
+      },
+      // B2: chế độ khi audio vượt giới hạn + nhãn "Phần i/n" + điểm cắt kéo tay.
+      split: {
+        mode: state.splitMode,
+        label_enabled: $("opt-label-enable").checked,
+        label_position: state.labelPosition,
+        label_size_px: Number($("opt-label-size").value),
+        label_color: $("opt-label-color").value,
+        cuts: manualCutsPayload(),
+      },
     };
   }
 
@@ -1653,6 +2559,8 @@
     const pw = $("progress-wrap");
     pw.classList.add("show");
     pw.style.display = "block";
+    // M2: job mới → reset mốc tiến độ của job cũ.
+    state.lastShownPct = 0;
     $("progress-fill").style.width = "0%";
     $("progress-label").textContent = "Đang xử lý… 0%";
     $("progress-pct").textContent = "0%";
@@ -1671,9 +2579,14 @@
       if (!res.ok) throw new Error(data.error || `Lỗi HTTP ${res.status}`);
       pollFails = 0;
 
+      // M2: tiến độ thanh chỉ nhận giá trị >= giá trị đã hiển thị — cùng
+      // job_id không bao giờ lùi; reset duy nhất khi startPolling (job mới).
       const pct = Math.max(0, Math.min(100, Math.round(data.progress || 0)));
-      $("progress-fill").style.width = `${pct}%`;
-      $("progress-pct").textContent = `${pct}%`;
+      if (pct >= (state.lastShownPct ?? 0)) {
+        $("progress-fill").style.width = `${pct}%`;
+        $("progress-pct").textContent = `${pct}%`;
+        state.lastShownPct = pct;
+      }
       renderChildren(data.children || []);
 
       switch (data.status) {
@@ -1682,7 +2595,7 @@
           break;
         case "running":
           $("progress-label").textContent =
-            `Đang xử lý… (${data.done_count}/${data.total_count} preset)`;
+            `Đang xử lý… (${data.done_count}/${data.total_count} ${childUnit(data.children || [])})`;
           break;
         case "done":
           finishPolling();
@@ -1690,24 +2603,59 @@
           $("progress-pct").textContent = "100%";
           $("progress-label").textContent =
             data.done_count < data.total_count
-              ? `Xong ${data.done_count}/${data.total_count} preset.`
+              ? `Xong ${data.done_count}/${data.total_count} ${childUnit(data.children || [])}.`
               : "Hoàn tất! Sẵn sàng tải xuống.";
           if (data.has_zip) {
             $("btn-download-zip").href = `/api/jobs/${state.jobId}/download`;
             $("btn-download-zip").style.display = "inline-flex";
           }
           if (data.error) showError(data.error);
-          else toast("Xuất video hoàn tất 🎉", "ok", 4500);
-          loadLibrary(); // nạp lại kho video ở cuối trang
-          // Xem ngay video đầu tiên hoàn tất (không cần tải về).
-          const firstDone = (data.children || []).find((c) => c.status === "done");
-          if (firstDone) {
-            openVideoModal(
-              `Hoàn tất — ${firstDone.label}`,
-              `/api/jobs/${state.jobId}/stream/${encodeURIComponent(firstDone.preset_id)}`,
-              `/api/jobs/${state.jobId}/download/${encodeURIComponent(firstDone.preset_id)}`,
+          else {
+            // M7: KHÔNG tự mở hộp xem video — toast "Xong ✓" kèm nút hành động.
+            // B2: URL theo khoá job con (`<preset>.phanN` khi chia phần).
+            const firstDone = (data.children || []).find((c) => c.status === "done");
+            const firstKey = firstDone ? firstDone.key || firstDone.preset_id : null;
+            const streamUrl = firstKey
+              ? `/api/jobs/${state.jobId}/stream/${encodeURIComponent(firstKey)}`
+              : null;
+            const dlUrl = firstKey
+              ? `/api/jobs/${state.jobId}/download/${encodeURIComponent(firstKey)}`
+              : (data.has_zip ? `/api/jobs/${state.jobId}/download` : null);
+            const actions = [];
+            if (firstDone) {
+              actions.push({
+                label: "Xem",
+                onClick: () =>
+                  openVideoModal(
+                    `Hoàn tất — ${firstDone.label}`,
+                    streamUrl,
+                    dlUrl,
+                  ),
+              });
+            }
+            if (dlUrl) {
+              actions.push({
+                label: "Tải",
+                onClick: () => {
+                  const a = document.createElement("a");
+                  a.href = dlUrl;
+                  a.download = "";
+                  document.body.appendChild(a);
+                  a.click();
+                  a.remove();
+                },
+              });
+            }
+            toast(
+              data.done_count < data.total_count
+                ? `Xong ✓ ${data.done_count}/${data.total_count} ${childUnit(data.children || [])}`
+                : "Xong ✓",
+              "ok",
+              6000,
+              actions,
             );
           }
+          loadLibrary(); // nạp lại kho video ở cuối trang
           state.busy = false;
           refreshExportButton();
           break;
@@ -1744,16 +2692,30 @@
     error: "Lỗi", cancelled: "Đã huỷ",
   };
 
+  // Đơn vị đếm job con: "file" khi có phần chia (B2), không thì "preset".
+  function childUnit(children) {
+    return (children || []).some((c) => c.part) ? "file" : "preset";
+  }
+
   function renderChildren(children) {
     const list = $("child-list");
     list.innerHTML = "";
     for (const c of children) {
+      // B2: khoá job con — `<preset>.phanN` khi chia phần, không thì preset_id.
+      const key = c.key || c.preset_id;
       const row = document.createElement("div");
       row.className = "child-row" + (c.status === "done" ? " done" : "") + (c.status === "error" ? " error" : "");
 
       const label = document.createElement("div");
       label.className = "c-label";
       label.textContent = c.label;
+      if (c.part) {
+        // Khoảng audio của phần này trên audio gốc: "0:00–8:20".
+        const range = document.createElement("span");
+        range.className = "c-range";
+        range.textContent = ` · ${formatDuration(c.part.start)}–${formatDuration(c.part.end)}`;
+        label.appendChild(range);
+      }
       row.appendChild(label);
 
       const bar = document.createElement("div");
@@ -1778,14 +2740,14 @@
         view.addEventListener("click", () => {
           openVideoModal(
             `Xem trước — ${c.label}`,
-            `/api/jobs/${state.jobId}/stream/${encodeURIComponent(c.preset_id)}`,
-            `/api/jobs/${state.jobId}/download/${encodeURIComponent(c.preset_id)}`,
+            `/api/jobs/${state.jobId}/stream/${encodeURIComponent(key)}`,
+            `/api/jobs/${state.jobId}/download/${encodeURIComponent(key)}`,
           );
         });
         row.appendChild(view);
         const dl = document.createElement("a");
         dl.className = "c-dl";
-        dl.href = `/api/jobs/${state.jobId}/download/${encodeURIComponent(c.preset_id)}`;
+        dl.href = `/api/jobs/${state.jobId}/download/${encodeURIComponent(key)}`;
         dl.textContent = "Tải ↓";
         row.appendChild(dl);
       } else {
@@ -1923,6 +2885,20 @@
   for (const id of ["txt-enable", "sub-enable", "wm-enable", "wm-shadow", "wm-moving", "opt-fast", "opt-progress", "opt-viz", "opt-quality"]) {
     $(id).addEventListener("change", updateOverlayPreview);
   }
+
+  // M4: hiện/ẩn + nhãn live cho các điều khiển visualizer / màu thanh tiến độ.
+  function syncVizControls() {
+    const vizOn = $("opt-viz").value !== "none";
+    $("viz-opts").hidden = !vizOn;
+    $("progress-color-field").hidden = !$("opt-progress").checked;
+    $("viz-height-value").textContent = `${$("opt-viz-height").value}%`;
+    $("viz-opacity-value").textContent = `${$("opt-viz-opacity").value}%`;
+  }
+  for (const id of ["opt-viz", "opt-progress", "opt-viz-position", "opt-viz-height", "opt-viz-color", "opt-viz-opacity", "opt-progress-color"]) {
+    $(id).addEventListener("input", syncVizControls);
+    $(id).addEventListener("change", syncVizControls);
+  }
+  syncVizControls();
 
   // Chế độ nguồn phụ đề: Tự động (ASR) hay Tệp .srt.
   $("sub-source-row").addEventListener("click", (e) => {
@@ -2309,7 +3285,10 @@
   }
 
   // ======================================================= video modal
+  // M7: hộp xem video — đóng bằng Esc / nền / nút X; trả focus về nút đã mở.
+  let videoModalOpener = null;
   function openVideoModal(title, streamUrl, downloadUrl) {
+    videoModalOpener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     $("video-modal-title").textContent = title;
     const player = $("video-modal-player");
     player.src = streamUrl;
@@ -2318,6 +3297,7 @@
     const dl = $("video-modal-dl");
     dl.href = downloadUrl;
     $("video-modal").hidden = false;
+    $("video-modal-close").focus();
   }
   function closeVideoModal() {
     const player = $("video-modal-player");
@@ -2325,6 +3305,11 @@
     player.removeAttribute("src");
     player.load();
     $("video-modal").hidden = true;
+    // Trả focus về phần tử đã mở hộp (nút Xem / item kho) — không mất chỗ.
+    if (videoModalOpener && document.contains(videoModalOpener)) {
+      videoModalOpener.focus();
+    }
+    videoModalOpener = null;
   }
   $("video-modal-close").addEventListener("click", closeVideoModal);
   $("video-modal").addEventListener("click", (e) => {
@@ -2343,7 +3328,8 @@
       const d = await res.json();
       const maxGB = d.library_max_gb || 5;
       const maxFiles = d.library_max_files || 200;
-      const usedGB = (d.library_used_bytes || 0) / 1e9;
+      const usedBytes = d.library_used_bytes || 0;
+      const usedGB = usedBytes / 1e9;
       const usedFiles = d.library_used_files || 0;
       // Thanh theo % dung lượng; % số file hiển thị kèm trong text.
       const pct = Math.min(100, (usedGB / maxGB) * 100);
@@ -2353,8 +3339,9 @@
       fill.classList.toggle("warn", pct >= 80 && pct < 100);
       fill.classList.toggle("danger", pct >= 100);
       const filePct = (usedFiles / maxFiles) * 100;
+      // M5: cùng hàm formatBytes (KB/MB/GB, <10 hiện 2 chữ số).
       $("lib-usage-text").textContent =
-        `Đã dùng ${usedGB.toFixed(2)} / ${maxGB} GB · ${usedFiles} / ${maxFiles} file`;
+        `Đã dùng ${formatBytes(usedBytes)} / ${formatBytes(maxGB * 1e9)} · ${usedFiles} / ${maxFiles} file`;
       const warn = $("lib-usage-warn");
       if (pct >= 100 || filePct >= 100) {
         warn.hidden = false;
@@ -2518,11 +3505,288 @@
 
   // ======================================================= init
   renderTplGallery();
+  // M3: chụp mặc định TRƯỚC khi khôi phục cấu hình đã lưu, rồi áp cấu hình cũ.
+  snapshotDefaults();
+  restoreSettings();
+  syncSplitControls(); // B2: đồng bộ seg-row cắt/chia + ô nhãn theo cấu hình
   loadPresets();
   loadFonts();
   loadLibrary();
+  // Áp xong cấu hình → làm mới các nhãn slider / visualizer theo giá trị thật.
+  syncVizControls();
+  document.querySelectorAll('input[type="range"]').forEach((el) => {
+    paintSlider(el);
+    el.dispatchEvent(new Event("input", { bubbles: false }));
+  });
+  syncPresetUI();
   updateOverlayPreview();
   updateStats();
+})();
+</script>
+<script>
+(function () {
+  "use strict";
+  // ======================================================= Lớp UX bổ sung (tham khảo uiverse.io / lucianlabs UX/UI)
+  // Chỉ dùng DOM + id/class sẵn có của script chính; mọi hiệu ứng tắt khi người dùng chọn
+  // prefers-reduced-motion. Lỗi ở đây không được làm hỏng luồng xuất chính.
+  const $ = (s, r) => (r || document).querySelector(s);
+  const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+  const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const finePointer = window.matchMedia && window.matchMedia("(pointer: fine)").matches;
+  const raf2 = (fn) => requestAnimationFrame(() => requestAnimationFrame(fn));
+
+  // 1) Điều khiển phân đoạn: con trỏ trượt theo nút đang chọn (seg-row / fit-row / tab-row).
+  //    Không có JS thì style .selected cũ vẫn dùng được.
+  function initSeg(row) {
+    if (!row || row.dataset.segReady) return;
+    row.dataset.segReady = "1";
+    const thumb = document.createElement("span");
+    thumb.className = "seg-thumb";
+    thumb.setAttribute("aria-hidden", "true");
+    row.prepend(thumb);
+    row.classList.add("has-thumb");
+    const sync = () => {
+      const btn = row.querySelector(".seg-btn.selected, .tab-btn.selected");
+      if (!btn) { thumb.style.opacity = "0"; return; }
+      thumb.style.opacity = "1";
+      thumb.style.left = btn.offsetLeft + "px";
+      thumb.style.top = btn.offsetTop + "px";
+      thumb.style.width = btn.offsetWidth + "px";
+      thumb.style.height = btn.offsetHeight + "px";
+    };
+    sync();
+    if ("ResizeObserver" in window) new ResizeObserver(sync).observe(row);
+    new MutationObserver(sync).observe(row, { attributes: true, subtree: true, attributeFilter: ["class"] });
+    row.addEventListener("click", () => raf2(sync));
+    row.addEventListener("rvm:sync", sync);
+    window.addEventListener("load", sync);
+  }
+  const segRows = $$(".seg-row, .fit-row, .tab-row");
+  segRows.forEach(initSeg);
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => segRows.forEach((r) => r.dispatchEvent(new Event("rvm:sync"))));
+  }
+
+  // 2) Ripple lan từ chỗ bấm (nút to, chip, tab).
+  if (!reduced) {
+    document.addEventListener("pointerdown", (e) => {
+      const t = e.target.closest(".btn, .preset-chip, .seg-btn, .tab-btn, .hero-step, .sp-reset, .t-btn");
+      if (!t || t.disabled) return;
+      const r = t.getBoundingClientRect();
+      const d = Math.max(r.width, r.height) * 2;
+      const s = document.createElement("span");
+      s.className = "ripple";
+      s.style.width = s.style.height = d + "px";
+      s.style.left = (e.clientX - r.left - d / 2) + "px";
+      s.style.top = (e.clientY - r.top - d / 2) + "px";
+      t.appendChild(s);
+      setTimeout(() => s.remove(), 700);
+    });
+  }
+
+  // 3) Card hiện dần khi cuộn tới (fallback: hiện hết sau 3s).
+  const cards = $$(".card");
+  if (!reduced && "IntersectionObserver" in window) {
+    document.documentElement.classList.add("reveal");
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((en) => {
+        if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); }
+      });
+    }, { threshold: 0.06, rootMargin: "0px 0px -40px 0px" });
+    cards.forEach((c) => io.observe(c));
+    setTimeout(() => cards.forEach((c) => c.classList.add("in")), 3000);
+  } else {
+    cards.forEach((c) => c.classList.add("in"));
+  }
+
+  // 4) Theo dõi 3 bước ở hero: xong → dấu tick, bước đang làm → viền sáng.
+  const steps = $$(".hero-step");
+  function syncSteps() {
+    if (!steps.length) return;
+    const hasSrc = $$(".clip-card").length > 0 && $$(".audio-card").length > 0;
+    const hasPreset = !!$(".preset-chip.selected");
+    const label = ($("#progress-label") || {}).textContent || "";
+    const wrap = $("#progress-wrap");
+    const done3 = !!(wrap && wrap.classList.contains("show")) && /Hoàn tất|Xong/.test(label);
+    steps[0].classList.toggle("done", hasSrc);
+    steps[1].classList.toggle("done", hasPreset);
+    steps[2].classList.toggle("done", done3);
+    const cur = !hasSrc ? 0 : !hasPreset ? 1 : 2;
+    steps.forEach((s, i) => s.classList.toggle("current", i === cur));
+  }
+  ["#clips-list", "#audio-list", "#preset-grid", "#progress-label"].forEach((sel) => {
+    const el = $(sel);
+    if (el) new MutationObserver(() => requestAnimationFrame(syncSteps)).observe(el, { attributes: true, childList: true, subtree: true, characterData: true, attributeFilter: ["class"] });
+  });
+  window.addEventListener("load", syncSteps);
+  syncSteps();
+
+  // 5) Nút "Lên đầu trang" (rocket).
+  const toTop = document.createElement("button");
+  toTop.type = "button";
+  toTop.id = "to-top";
+  toTop.className = "to-top";
+  toTop.setAttribute("aria-label", "Lên đầu trang");
+  toTop.innerHTML = "<span>🚀</span>";
+  document.body.appendChild(toTop);
+  const onScroll = () => toTop.classList.toggle("show", window.scrollY > 480);
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+  toTop.addEventListener("click", () => window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" }));
+
+  // 6) Tooltip CSS cho nút icon: chép title → data-tip (title giữ nguyên cho trình đọc màn hình).
+  function decorate(root) {
+    $$(".icon-btn[title], .theme-btn[title], .out-view-btn[title], .lib-head-btn[title]", root).forEach((b) => {
+      if (!b.dataset.tip) b.dataset.tip = b.title;
+    });
+  }
+  decorate(document);
+  new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach((n) => { if (n.nodeType === 1) decorate(n); })))
+    .observe(document.body, { childList: true, subtree: true });
+
+  // 7) Phím tắt Ctrl/Cmd + Enter = Xuất video; gợi ý phím ngay trên nút (chỉ trên chuột).
+  const exportBtn = $("#btn-export");
+  if (exportBtn && finePointer) {
+    const k = document.createElement("span");
+    k.className = "kbd";
+    k.setAttribute("aria-hidden", "true");
+    k.textContent = "Ctrl↵";
+    exportBtn.appendChild(k);
+  }
+  document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && exportBtn && !exportBtn.disabled) {
+      e.preventDefault();
+      exportBtn.click();
+    }
+  });
+
+  // 8) Nút Xuất: đang chạy → "thở"; xong → xanh + pháo giấy; lỗi/huỷ → trở lại bình thường.
+  const cancelBtn = $("#btn-cancel");
+  const progressLabel = $("#progress-label");
+  let armed = false;
+  function burstConfetti(anchor) {
+    if (reduced || !anchor) return;
+    const r = anchor.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    const colors = ["#6366f1", "#818cf8", "#2dd4bf", "#34d399", "#fbbf24", "#f472b6"];
+    for (let i = 0; i < 36; i++) {
+      const p = document.createElement("i");
+      p.className = "confetti";
+      const ang = ((-90 + (Math.random() - 0.5) * 140) * Math.PI) / 180;
+      const v = 90 + Math.random() * 160;
+      p.style.setProperty("--dx", Math.cos(ang) * v + "px");
+      p.style.setProperty("--dy", Math.sin(ang) * v + 60 + "px");
+      p.style.setProperty("--rot", Math.random() * 720 - 360 + "deg");
+      p.style.setProperty("--c", colors[i % colors.length]);
+      p.style.left = cx + "px";
+      p.style.top = cy + "px";
+      document.body.appendChild(p);
+      setTimeout(() => p.remove(), 1000);
+    }
+  }
+  function syncExportState() {
+    if (!exportBtn) return;
+    const running = !!cancelBtn && cancelBtn.style.display === "inline-flex";
+    const label = progressLabel ? progressLabel.textContent : "";
+    if (running) { armed = true; exportBtn.dataset.state = "loading"; return; }
+    if (!armed) return;
+    armed = false;
+    exportBtn.dataset.state = /Thất bại|Đã huỷ/.test(label) ? "" : "done";
+    if (/Hoàn tất/.test(label)) burstConfetti($(".progress-bar") || exportBtn);
+  }
+  if (cancelBtn) new MutationObserver(syncExportState).observe(cancelBtn, { attributes: true, attributeFilter: ["style"] });
+  if (progressLabel) new MutationObserver(syncExportState).observe(progressLabel, { childList: true, characterData: true, subtree: true });
+
+  // 9) Bộ đếm ký tự cho "Tên sản phẩm" (tối đa 120).
+  const nameInput = $("#opt-name");
+  if (nameInput) {
+    const counter = document.createElement("span");
+    counter.className = "char-count";
+    counter.setAttribute("aria-live", "polite");
+    nameInput.insertAdjacentElement("afterend", counter);
+    const upd = () => {
+      const n = nameInput.value.length;
+      const max = Number(nameInput.maxLength) || 0;
+      counter.textContent = n ? `${n}/${max}` : "";
+      counter.classList.toggle("near", max > 0 && n >= max * 0.85);
+    };
+    nameInput.addEventListener("input", upd);
+    upd();
+  }
+
+  // 10) Mini player: nghe thử audio ngay trong thẻ (một bài mỗi lúc).
+  //     Bắt File qua URL.createObjectURL mà script chính gọi khi thêm audio (theo tên file).
+  const audioFiles = new Map();
+  const origCreate = URL.createObjectURL;
+  URL.createObjectURL = function (blob) {
+    const url = origCreate.call(URL, blob);
+    if (blob instanceof File && /\.(mp3|wav|m4a|aac|ogg|oga|opus|flac|wma|aiff?)$/i.test(blob.name)) audioFiles.set(blob.name, blob);
+    return url;
+  };
+  const player = new Audio();
+  player.preload = "metadata";
+  let playingCard = null;
+  const fmt = (s) => {
+    if (!Number.isFinite(s) || s < 0) return "0:00";
+    const m = Math.floor(s / 60);
+    return `${m}:${String(Math.floor(s - m * 60)).padStart(2, "0")}`;
+  };
+  function resetCard(card) {
+    if (!card) return;
+    const b = $(".mini-play", card);
+    if (b) { b.textContent = "▶"; b.setAttribute("aria-label", "Nghe thử"); }
+    const f = $(".mini-prog i", card);
+    if (f) f.style.width = "0%";
+    const t = $(".mini-time", card);
+    if (t) t.textContent = "";
+    card.classList.remove("playing");
+  }
+  player.addEventListener("timeupdate", () => {
+    if (!playingCard) return;
+    const f = $(".mini-prog i", playingCard);
+    const t = $(".mini-time", playingCard);
+    if (f && Number.isFinite(player.duration)) f.style.width = `${(player.currentTime / player.duration) * 100}%`;
+    if (t) t.textContent = `${fmt(player.currentTime)} / ${fmt(player.duration)}`;
+  });
+  player.addEventListener("ended", () => { resetCard(playingCard); playingCard = null; });
+  player.addEventListener("error", () => { resetCard(playingCard); playingCard = null; });
+  function enhanceAudioCard(card) {
+    if (!card || card.classList.contains("enhanced")) return;
+    const nameEl = $(".c-name", card);
+    const info = nameEl ? nameEl.parentElement : null;
+    if (!nameEl || !info) return;
+    card.classList.add("enhanced");
+    const play = document.createElement("button");
+    play.type = "button";
+    play.className = "mini-play";
+    play.textContent = "▶";
+    play.setAttribute("aria-label", "Nghe thử");
+    play.title = "Nghe thử";
+    const prog = document.createElement("div");
+    prog.className = "mini-prog";
+    prog.setAttribute("aria-hidden", "true");
+    prog.innerHTML = "<i></i>";
+    const time = document.createElement("span");
+    time.className = "mini-time";
+    card.prepend(play);
+    info.appendChild(prog);
+    const meta = $(".c-meta", card);
+    if (meta) meta.appendChild(time);
+    play.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const file = audioFiles.get(nameEl.textContent);
+      if (!file) return;
+      if (playingCard === card && !player.paused) { player.pause(); card.classList.remove("playing"); play.textContent = "▶"; return; }
+      if (playingCard && playingCard !== card) resetCard(playingCard);
+      playingCard = card;
+      player.src = origCreate.call(URL, file);
+      player.play().then(() => { play.textContent = "⏸"; card.classList.add("playing"); }).catch(() => {});
+    });
+  }
+  $$(".audio-card").forEach(enhanceAudioCard);
+  const audioList = $("#audio-list");
+  if (audioList) new MutationObserver(() => $$(".audio-card").forEach(enhanceAudioCard)).observe(audioList, { childList: true });
 })();
 </script>
 

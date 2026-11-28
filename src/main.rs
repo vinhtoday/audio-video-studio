@@ -7,10 +7,12 @@ mod naming;
 mod storage;
 mod presets;
 mod routes;
+mod split;
 mod subtitle;
 mod textover;
 mod visuals;
 mod zipwriter;
+mod datadir;
 
 use jobs::JobStore;
 use presets::Registry;
@@ -38,9 +40,14 @@ async fn main() {
         std::process::exit(1);
     }
 
-    // Chuẩn bị thư mục workspace.
-    if let Err(e) = std::fs::create_dir_all(jobs::WORKSPACE_DIR) {
-        tracing::error!("Không tạo được thư mục workspace: {e}");
+    // M8: thư mục dữ liệu (RVM_DATA_DIR / tương thích CWD / cạnh exe) — in
+    // đường dẫn đang dùng + cảnh báo nếu rơi vào nhánh tương thích ngược.
+    let data_dir = datadir::data_dir();
+    std::fs::create_dir_all(&data_dir).ok();
+
+    // Chuẩn bị thư mục workspace (trong thư mục dữ liệu).
+    if let Err(e) = std::fs::create_dir_all(jobs::workspace_dir()) {
+        tracing::error!("Không tạo được thư mục workspace ({}): {e}", jobs::workspace_dir().display());
         return;
     }
     // Dọn thư mục job mồ côi từ lần chạy trước bị kill đột ngột.
@@ -127,7 +134,8 @@ async fn main() {
         if shutdown_signal().await.is_some() {
             tracing::info!("Nhận tín hiệu dừng, đang tắt...");
             shutdown_store.kill_all().await;
-            if let Err(e) = tokio::fs::remove_dir_all(jobs::WORKSPACE_DIR).await {
+            let ws = jobs::workspace_dir();
+            if let Err(e) = tokio::fs::remove_dir_all(&ws).await {
                 if e.kind() != std::io::ErrorKind::NotFound {
                     tracing::warn!("Không dọn được workspace: {e}");
                 }

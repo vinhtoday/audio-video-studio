@@ -28,6 +28,8 @@ Web app chạy local (Rust + Axum + FFmpeg): tải binary về, mở trình duy�
 | 🗄️ **Giới hạn lưu trữ** (A3) | Kho video mặc định **5 GB / 200 file** (sửa trong UI hoặc `settings.json`; env `RVM_LIBRARY_MAX_GB`, `RVM_LIBRARY_MAX_FILES` ghi đè). Vượt ngưỡng → tự xoá file **cũ nhất** (sau mỗi job + lúc khởi động), không bao giờ đụng file job đang chạy; file đơn lớn hơn giới hạn được giữ lại + cảnh báo. Thanh dung lượng cảnh báo màu khi ≥ 80%; nút **Dọn ngay** xoá về 70% có xác nhận. Trước khi render, kiểm tra đĩa còn `tổng input × 3` — thiếu chỗ thì từ chối job với số GB còn/cần (statvfs / Windows API). |
 | 🏷️ **Tên sản phẩm** (A2) | Nhập tên ở bước Xuất → file tải về mang đúng tên đó: 1 preset `<tên>.mp4`, nhiều preset `<tên>_<preset>.mp4` + zip `<tên>.zip`. Làm sạch an toàn (NFC, ≤100 ký tự, xoá ký tự cấm, né tên Windows như `CON`); tuỳ chọn **bỏ dấu tiếng Việt** (`Kem chống nắng` → `Kem-chong-nang`). Trùng tên trong kho tự thành ` (2)`, ` (3)` — không bao giờ ghi đè. Header tải về dùng `filename` + `filename*` RFC 6266 nên trình duyệt hiện đúng dấu tiếng Việt. |
 | 🌗 **Giao diện** | Dark/Light theo hệ điều hành, responsive từ 375px, tiếng Việt, **1 luồng tuyến tính 5 bước** (Nguồn → Nền tảng → Xem trước → Tuỳ chọn → Xuất) + kho video ở cuối — chỉ đúng 1 nút Xuất trên toàn trang. |
+| ✨ **Giao diện v2** | Làm mới theo phong cách uiverse.io / lucianlabs UX/UI: nền aurora trôi, card thuỷ tinh viền gradient, nút Xuất có viền sáng quay + ripple, nhóm pill có **con trỏ trượt**, **checkbox → công tắc**, thanh kéo phát sáng, vùng thả file viền gradient, chip preset viền gradient, toast thuỷ tinh có thanh thời gian (dừng khi rê chuột), modal nảy vào. JS thêm: theo dõi **3 bước ở hero** (tick khi xong), nghe thử audio ngay trong thẻ (mini player), nút **về đầu trang**, tooltip, phím tắt **Ctrl/⌘ + Enter** để xuất, nút Xuất chuyển **đang chạy → xong** kèm pháo giấy, đếm ký tự tên sản phẩm, card hiện dần khi cuộn. Mọi hiệu ứng tắt khi hệ chọn giảm chuyển động; theme sáng/tối đều được chỉnh riêng. |
+| ✂️ **Tự chia phần** (B2) | Audio dài hơn `max_duration_sec` của preset: chọn **Cắt cụt** (hành vi cũ, mặc định) hoặc **Chia phần**. Chia thành **số phần tối thiểu**, dài gần đều nhau, **ưu tiên cắt tại đoạn im lặng** (`silencedetect`, trong ±15% độ dài phần), không phần vượt giới hạn, không phần ngắn hơn 5s. Mỗi phần là **một job con riêng** (tiến độ / huỷ / tải riêng), audio lấy đúng đoạn, video lặp từ đầu, fade-in 0.15s / fade-out 0.3s ở điểm cắt. Tên `<tên>_phan1.mp4`… (nhiều preset: `<tên>_<preset>_phan1.mp4`), zip gom vào thư mục từng preset. Tuỳ chọn gắn nhãn **"Phần i/n"** (vị trí, cỡ, màu; mặc định tắt). UI cảnh báo "Audio 8:20 > 3:00 → sẽ chia thành 3 phần", xem trước các điểm cắt trên thanh thời gian, **kéo tay từng điểm** hoặc dùng phím mũi tên (Shift = 5s); chế độ chia và tuỳ chọn nhãn được ghi nhớ. |
 
 ### Xử lý "cứng" các edge-case thực tế
 
@@ -72,7 +74,20 @@ RVM_HOST=0.0.0.0 ./radio-video-merger         # mở cho máy khác trong LAN
 RVM_MAX_PARALLEL=2 ./radio-video-merger       # giới hạn render song song
 RVM_FFMPEG_PATH=/path/ffmpeg \
 RVM_FFPROBE_PATH=/path/ffprobe ./radio-video-merger   # ffmpeg đặt chỗ khác
+RVM_DATA_DIR=/path/to/data ./radio-video-merger       # đặt chỗ lưu dữ liệu
 ```
+
+### Thư mục dữ liệu
+
+`settings.json`, `library/` (kho video đã xuất) và `workspace/` (job đang
+chạy) nằm trong **thư mục chứa file exe**. Thay đổi bằng `RVM_DATA_DIR`
+(đường dẫn hiện đang dùng được in ra log lúc khởi động).
+
+Tương thích ngược: nếu thư mục hiện hành (nơi bạn gọi lệnh) đã có `library/`
+hoặc `workspace/` từ bản cũ mà thư mục exe chưa có, app dùng thư mục hiện hành
+và ghi cảnh báo trong log — kho video cũ không bị mất. Muốn chuyển hẳn sang
+thư mục exe: đặt `RVM_DATA_DIR`, hoặc di chuyển `library/` + `workspace/` +
+`settings.json` sang đó rồi xoá bản cũ.
 
 Frontend nhúng thẳng trong binary — 1 file chạy được, không cần nginx.
 
@@ -162,7 +177,7 @@ Ví dụ `options`:
 ## 🧪 Kiểm thử
 
 ```bash
-cargo test --release   # 94 unit test
+cargo test --release   # 234 unit test
 ```
 
 Phạm vi: filter args từng preset × fit mode, offset xfade cộng dồn, escape hex↔ASS, drawtext/subtitles/watermark 5 vị trí + safe-zone + moving `mod(t/N,4)`, logo graph, zip CRC32, preset override, rotation 90/180/270, JSON brace-matching, cắt theo `max_duration_sec` (kể cả tính lại fade-out).
@@ -212,6 +227,7 @@ Bộ E2E encode thật (`scripts/`): input xoay metadata, VFR, 4K, MKV/WebM/MOV,
 - Safe-zone là ước lượng theo UI từng nền tảng tại thời điểm viết — chỉnh trong `presets_config.json`.
 - Font upload cho **phụ đề** chưa áp dụng được (subtitles dùng `FontName` qua fontconfig).
 - Watermark moving xoay 4 góc theo chu kỳ cố định.
+- Chia phần (B2): bản xem trước trong UI vẽ chia **đều**; server có thể dời điểm cắt sang đoạn im lặng gần nhất (±15%) trừ các điểm đã **kéo tay** (dùng nguyên). Đoạn audio dưới 5s không tách thành phần riêng mà gộp vào phần trước.
 
 ## 📄 License
 
@@ -228,4 +244,6 @@ MIT — xem [LICENSE](LICENSE).
 ## Lịch sử phiên bản
 
 - **Bản 0.5.0** — A1 Tách âm thanh MP3 · A2 Tên sản phẩm · A3 Giới hạn lưu trữ kho video. Chi tiết: [`RELEASE-0.5.0.md`](RELEASE-0.5.0.md).
+- **Bản 0.5.0 + B3 (28/11)** — Giao diện v2 (CSS/JS làm mới) · rà lại `src/`: gộp 3 chỗ tính độ dài output và 2 runner `silencedetect` trùng nhau thành một, `cargo clippy` sạch lỗi · kiểm giao diện tự động `scripts/e2e_b2_ui.sh` (105) + `scripts/e2e_ui_v2.sh` (25).
+- **Bản 0.5.0 + B1/B2 (28/11)** — B1 hoàn thiện (xem trước WYSIWYG, tiến độ không lùi, ghi nhớ cấu hình `rvm-settings`, `RVM_DATA_DIR`, xuất stereo) · **B2 Tự chia phần** khi audio vượt `max_duration_sec` (thuật toán ở `src/split.rs`, E2E `scripts/e2e_b2_split.py`, kiểm UI `scripts/e2e_b2_ui.sh`).
 - **Bản 0.4** — rà soát mã nguồn + visualizer sóng âm, thanh tiến độ, chất lượng encode. Chi tiết: [`RELEASE-0.4.md`](RELEASE-0.4.md).
